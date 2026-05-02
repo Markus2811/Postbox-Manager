@@ -7,6 +7,21 @@ export type ExtractResult = {
   needsVision: boolean;
 };
 
+/**
+ * pdfjs (in pdf-parse v2) erwartet Browser-Globals wie `DOMMatrix`.
+ * Unter Node (u. a. Vercel Serverless) fehlen die — @napi-rs/canvas stellt sie bereit
+ * (gleiches Muster wie `pdf-parse/worker`).
+ */
+async function ensurePdfjsCanvasGlobals(): Promise<void> {
+  const g = globalThis as unknown as Record<string, unknown>;
+  if (g.DOMMatrix) return;
+
+  const { DOMMatrix, Path2D, ImageData } = await import("@napi-rs/canvas");
+  g.DOMMatrix = DOMMatrix;
+  if (!g.Path2D) g.Path2D = Path2D;
+  if (!g.ImageData) g.ImageData = ImageData;
+}
+
 export async function extractDocumentContent(
   buffer: Buffer,
   mimeType: string
@@ -14,6 +29,7 @@ export async function extractDocumentContent(
   const mt = mimeType.toLowerCase();
 
   if (mt === "application/pdf") {
+    await ensurePdfjsCanvasGlobals();
     const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: new Uint8Array(buffer) });
     try {

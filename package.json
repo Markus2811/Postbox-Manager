@@ -27,6 +27,7 @@
     "test:auth": "node --env-file=.env.local scripts/test-auth-signup-login.mjs"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.80",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
     "@tanstack/react-query": "^5.100.8",

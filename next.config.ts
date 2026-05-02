@@ -16,7 +16,7 @@ const productionSecurityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdf-parse"],
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
   /**
    * Ohne diese Einträge blockiert `next dev` Anfragen von anderen Hostnamen (DNS-Rebind-Schutz).
    * Sonst funktionieren localhost:3000, aber Cloudflare-Quick-Tunnel / localtunnel nicht zuverlässig.
