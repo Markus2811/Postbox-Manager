@@ -1,28 +1,17 @@
 import { AppNav } from "@/components/app-nav";
-import { DocumentAdvancedAnalysis } from "@/app/documents/[id]/document-detail-actions";
+import { formatAiRawJsonAsPlainGerman } from "@/lib/documents/ai-metadata-plain-de";
 import { fetchDocumentDetailForUser } from "@/lib/documents/document-detail-fetch";
 import { formatCurrency, formatDate } from "@/lib/documents/format";
 import { humanizeDocumentTitle } from "@/lib/documents/humanize-title";
 import {
   completionNoteFromRawAi,
   effectiveDocumentWorkspace,
-  POSTBOX_JSON_KEY,
 } from "@/lib/documents/workspace-mvp";
 import { documentTypeUiLabel } from "@/lib/documents/categories";
 import { documentStatusUiLabel } from "@/lib/documents/ui-labels";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-
-function rawJsonWithoutPostbox(raw: Record<string, unknown> | null): string {
-  if (!raw || typeof raw !== "object") return "";
-  const { [POSTBOX_JSON_KEY]: _removed, ...rest } = raw;
-  try {
-    return JSON.stringify(rest, null, 2);
-  } catch {
-    return "";
-  }
-}
 
 export default async function DocumentDetailPage({
   params,
@@ -60,11 +49,10 @@ export default async function DocumentDetailPage({
     meta?.amount != null && !Number.isNaN(Number(meta.amount))
       ? formatCurrency(Number(meta.amount), meta.currency ?? "EUR")
       : null;
-  const rawPreview = rawJsonWithoutPostbox(
+  const aiPlainExtra =
     meta?.raw_ai_json && typeof meta.raw_ai_json === "object" && !Array.isArray(meta.raw_ai_json)
-      ? (meta.raw_ai_json as Record<string, unknown>)
-      : null
-  );
+      ? formatAiRawJsonAsPlainGerman(meta.raw_ai_json as Record<string, unknown>)
+      : "";
   const completionNote = meta?.raw_ai_json ? completionNoteFromRawAi(meta.raw_ai_json) : null;
 
   return (
@@ -168,14 +156,6 @@ export default async function DocumentDetailPage({
             </span>
           </summary>
           <div className="space-y-8 border-t border-zinc-100 px-6 py-6">
-            <div>
-              <h3 className="text-sm font-semibold text-zinc-800">Erweitert</h3>
-              <p className="mt-1 text-xs text-zinc-500">Auswertung erneut anstoßen (optional).</p>
-              <div className="mt-4">
-                <DocumentAdvancedAnalysis documentId={doc.id} status={doc.status} />
-              </div>
-            </div>
-
             {meta ? (
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-zinc-800">Auswertung</h3>
@@ -226,17 +206,17 @@ export default async function DocumentDetailPage({
               </dl>
             </div>
 
-            {rawPreview ? (
+            {aiPlainExtra ? (
               <div>
-                <h3 className="text-sm font-semibold text-zinc-800">Rohdaten (KI)</h3>
-                <pre className="mt-2 max-h-64 overflow-auto rounded-xl bg-zinc-50 p-4 text-xs text-zinc-700 ring-1 ring-zinc-200/80">
-                  {rawPreview}
-                </pre>
+                <h3 className="text-sm font-semibold text-zinc-800">Auswertung (Details)</h3>
+                <p className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-700 ring-1 ring-zinc-200/80">
+                  {aiPlainExtra}
+                </p>
               </div>
             ) : null}
 
             {!meta ? (
-              <p className="text-sm text-zinc-500">Noch keine Auswertung – unter „Erweitert“ kannst du sie starten.</p>
+              <p className="text-sm text-zinc-500">Für dieses Dokument liegt noch keine Auswertung vor.</p>
             ) : null}
           </div>
         </details>
