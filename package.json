@@ -1,0 +1,54 @@
+{
+  "name": "postbox-manager",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "dev:tunnel": "concurrently -k -n dev,tunnel -c blue,magenta \"npm run dev\" \"wait-on http://127.0.0.1:3000 && cloudflared tunnel --url http://127.0.0.1:3000\"",
+    "dev:lt": "concurrently -k -n dev,lt -c blue,green \"npm run dev\" \"wait-on http://127.0.0.1:3000 && npx localtunnel@2.0.2 --port 3000\"",
+    "tunnel": "cloudflared tunnel --url http://127.0.0.1:3000",
+    "tunnel:lt": "npx localtunnel@2.0.2 --port 3000",
+    "tunnel:ngrok": "ngrok http 3000",
+    "dev:ngrok": "concurrently -k -n dev,ng -c blue,yellow \"npm run dev\" \"wait-on http://127.0.0.1:3000 && ngrok http 3000\"",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test:security": "node --test ./scripts/security/middleware-routes.test.mjs",
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop",
+    "supabase:status": "npx supabase status",
+    "supabase:reset": "npx supabase db reset",
+    "generate-test-pdfs": "npx tsx scripts/generate-test-documents.ts",
+    "loadtest:four": "npx tsx --env-file=.env.local scripts/loadtest-upload-analyze.ts",
+    "admin:delete-docs": "node --env-file=.env.local scripts/delete-documents-by-email.mjs",
+    "test:auth": "node --env-file=.env.local scripts/test-auth-signup-login.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.105.1",
+    "@tanstack/react-query": "^5.100.8",
+    "next": "16.2.4",
+    "openai": "^6.35.0",
+    "pdf-parse": "^2.4.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^4.4.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "wait-on": "^8.0.3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "pdf-lib": "^1.17.1",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

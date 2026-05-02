@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Postbox Lasttest – Performance</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; background: #fafafa; color: #18181b; }
+    body { max-width: 960px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 1.35rem; }
+    h2 { font-size: 1.05rem; margin-top: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px #0001; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e4e4e7; }
+    th { background: #f4f4f5; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .04em; color: #71717a; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .bar { height: 6px; background: #6366f1; border-radius: 3px; margin-top: 6px; max-width: 100%; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 12px; margin: 16px 0; }
+    .tile { background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 3px #0001; }
+    .tile p { margin: 0; font-size: 0.8rem; color: #71717a; }
+    .tile strong { font-size: 1.25rem; display: block; margin-top: 4px; }
+    .note { font-size: 0.9rem; color: #52525b; line-height: 1.5; }
+    .err { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; margin-top: 16px; }
+    pre { white-space: pre-wrap; word-break: break-all; font-size: 0.85rem; }
+    code { font-size: 0.72rem; }
+  </style>
+</head>
+<body>
+  <h1>Postbox Manager – Lasttest &amp; Laufzeit</h1>
+  <p class="note">Erzeugt am <strong>2026-05-02T14:43:47.483Z</strong> auf diesem Rechner (Node.js).</p>
+  <p class="note">Konto: <strong>Markus (Lasttest)</strong> (po…@gmail.com) · Quelle: reports/.markus-loadtest-creds.json</p>
+
+  
+
+  <h2>CPU, RAM &amp; GPU – verständlich</h2>
+  <p class="note"><strong>Wichtig:</strong> Gemessen wird nur der <strong>Node.js-Prozess</strong> dieses Lasttests, <strong>nicht</strong> die komplette Windows-Auslastung (Task-Manager-Gesamt). Andere Programme fließen nicht ein.</p>
+
+  <h3>CPU (Prozessor)</h3>
+  <p class="note">Dein Rechner meldet <strong>14</strong> logische CPU(s). Daraus abgeleitete Größen:</p>
+  <table>
+    <thead><tr><th>Phase</th><th>Wandzeit</th><th>CPU-Zeit nur Node</th><th>Ø „aktive Kerne“</th><th>Anteil aller Kerne*</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Parallel PDF-Extraktion</td>
+        <td class="num">835 ms</td>
+        <td class="num">1,17 s</td>
+        <td class="num">≈ 1,40</td>
+        <td class="num">≈ 10,0 %</td>
+      </tr>
+      <tr>
+        <td>Sequentiell Upload + Analyse</td>
+        <td class="num">20577 ms</td>
+        <td class="num">0,81 s</td>
+        <td class="num">≈ 0,04</td>
+        <td class="num">≈ 0,3 %</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">* <strong>Anteil aller Kerne</strong> = (Ø aktive Kerne ÷ 14) × 100 %. Werte über 100 % sind hier begrenzt. Bei der sequentiellen Phase wartet Node meist auf <strong>Netzwerk (OpenAI)</strong> – dann ist die CPU-Zeit klein, die Wandzeit groß („Prozessor wirkt kaum ausgelastet, aber die Aufgabe dauert lange“).</p>
+
+  <h3>RAM (Arbeitsspeicher)</h3>
+  <p class="note">Installiert laut System: <strong>≈ 15,5 GiB</strong> (15836 MiB). <strong>RSS</strong> = physischer Speicher, den der Node-Prozess gerade beansprucht (nicht nur JavaScript-Heap).</p>
+  <ul class="note">
+    <li><strong>Peak nach Parallel-PDF:</strong> 666 MiB RSS ≈ <strong>4,2 %</strong> des installierten RAM – kurzer Spitzenwert durch paralleles Parsen.</li>
+    <li><strong>Nach allen Analysen:</strong> 355 MiB RSS ≈ <strong>2,2 %</strong> des installierten RAM.</li>
+  </ul>
+
+  <h3>GPU (Grafikkarte)</h3>
+  <p class="note"><strong>Praktisch keine Auslastung durch diesen Test.</strong> Es läuft kein lokales KI-Modell auf der GPU; OpenAI wird auf den Servern von OpenAI ausgeführt. Auf deinem PC sind nur Netzwerk, Node und <code>pdf-parse</code> beteiligt – typischerweise <strong>0 % sinnvolle GPU-Last</strong> für diesen Workload (Task-Manager „GPU“ bleibt nahezu unberührt).</p>
+
+  <h2>Kurzüberblick</h2>
+  <div class="tiles">
+    <div class="tile"><p>Parallel PDF-Extraktion (4×)</p><strong>835 ms</strong></div>
+    <div class="tile"><p>Sequentiell gesamt (4 Pipelines)</p><strong>20.6 s</strong></div>
+    <div class="tile"><p>Summe OpenAI (nur Wartezeit Client)</p><strong>15640 ms</strong></div>
+    <div class="tile"><p>Summe Extraktion</p><strong>31 ms</strong></div>
+  </div>
+
+  <h2>Interpretation (Performance)</h2>
+  <ul class="note">
+    <li><strong>OpenAI</strong> dominiert die Wandzeit beim sequentiellen Teil (Netzwerk + Modell). Die Balken zeigen die relative OpenAI-Dauer pro Dokument.</li>
+    <li><strong>pdf-parse</strong> (Extraktion) belastet kurz <strong>CPU und RAM</strong>; parallel sind mehrere Parser gleichzeitig aktiv.</li>
+    <li>Die vier PDFs liegen unter <code>Downloads/postbox-test-documents</code> und wurden in dasselbe Konto hochgeladen wie in der Web-App.</li>
+  </ul>
+
+  <h2>Details je Dokument</h2>
+  <table>
+    <thead><tr><th>Datei</th><th>document_id</th><th>Extraktion ms</th><th>OpenAI ms</th><th>DB ms</th><th>Gesamt ms</th></tr></thead>
+    <tbody><tr>
+  <td>13-bankkonto-mitteilung-synth.pdf</td>
+  <td><code>849ea452-37d9-4d96-80f4-08a3714ee629</code></td>
+  <td class="num">4</td>
+  <td class="num">4147<div class="bar" style="width:100%"></div></td>
+  <td class="num">229</td>
+  <td class="num">5291</td>
+</tr>
+<tr>
+  <td>14-amt-brief-synth.pdf</td>
+  <td><code>6b9ec659-99f4-4446-8027-b056168b9b1e</code></td>
+  <td class="num">4</td>
+  <td class="num">3883<div class="bar" style="width:94%"></div></td>
+  <td class="num">276</td>
+  <td class="num">4652</td>
+</tr>
+<tr>
+  <td>15-krankenkasse-synth.pdf</td>
+  <td><code>170210c8-a8d9-4831-8140-2fd635926242</code></td>
+  <td class="num">10</td>
+  <td class="num">3631<div class="bar" style="width:88%"></div></td>
+  <td class="num">524</td>
+  <td class="num">4735</td>
+</tr>
+<tr>
+  <td>16-steuer-vorauszahlung-synth.pdf</td>
+  <td><code>5666740a-040b-4dce-86e0-1c1b2f343225</code></td>
+  <td class="num">13</td>
+  <td class="num">3979<div class="bar" style="width:96%"></div></td>
+  <td class="num">302</td>
+  <td class="num">5899</td>
+</tr></tbody>
+  </table>
+
+  <h2>Speicher (Node process.memoryUsage)</h2>
+  <table>
+    <thead><tr><th>Phase</th><th>RSS MB</th><th>Heap used MB</th></tr></thead>
+    <tbody>
+      <tr><td>Vor Parallel-Extraktion</td><td class="num">131</td><td class="num">16</td></tr>
+      <tr><td>Nach Parallel-Extraktion</td><td class="num">666</td><td class="num">260</td></tr>
+      <tr><td>Nach 4 Analysen</td><td class="num">355</td><td class="num">222</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Rohwerte CPU (Node, Mikrosekunden)</h2>
+  <p class="note">Für Nachvollziehbarkeit: Parallel user 985000, system 188000 · Sequentiell user 719000, system 94000</p>
+</body>
+</html>
