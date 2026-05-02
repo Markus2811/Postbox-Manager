@@ -1,3 +1,4 @@
+import { resolveOpenAiChatModel } from "@/lib/ai/resolve-openai-model";
 import {
   detectAskFilters,
   filterAskRows,
@@ -135,7 +136,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "OPENAI_API_KEY fehlt" }, { status: 500 });
   }
 
-  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const model = resolveOpenAiChatModel();
   const openai = new OpenAI({ apiKey });
 
   const completion = await openai.chat.completions.create({
