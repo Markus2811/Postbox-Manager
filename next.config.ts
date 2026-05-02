@@ -16,7 +16,17 @@ const productionSecurityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas", "pdfjs-dist"],
+  /**
+   * pdfjs nutzt einen dynamischen Import von `pdf.worker.mjs`; Next/Vercel
+   * trägt die Worker-Datei sonst nicht in die Serverless-Funktion ein.
+   */
+  outputFileTracingIncludes: {
+    "/app/api/documents/analyze": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+    ],
+  },
   /**
    * Ohne diese Einträge blockiert `next dev` Anfragen von anderen Hostnamen (DNS-Rebind-Schutz).
    * Sonst funktionieren localhost:3000, aber Cloudflare-Quick-Tunnel / localtunnel nicht zuverlässig.

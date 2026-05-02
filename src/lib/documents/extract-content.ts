@@ -2,6 +2,9 @@
  * Text aus PDF (pdf-parse v2). Bilder: leerer Text → Aufrufer kann Vision nutzen.
  */
 
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
 export type ExtractResult = {
   text: string;
   needsVision: boolean;
@@ -22,6 +25,24 @@ async function ensurePdfjsCanvasGlobals(): Promise<void> {
   if (!g.ImageData) g.ImageData = ImageData;
 }
 
+/**
+ * Fake-Worker in Node importiert `GlobalWorkerOptions.workerSrc` dynamisch.
+ * Relativer Default `./pdf.worker.mjs` scheitert nach Next-Bundling / auf Vercel
+ * (`Cannot find module .../pdf.worker.mjs`). Absolute file-URL + Tracing-Fix.
+ */
+async function ensurePdfjsWorkerSrc(): Promise<void> {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const workerPath = path.join(
+    process.cwd(),
+    "node_modules",
+    "pdfjs-dist",
+    "legacy",
+    "build",
+    "pdf.worker.mjs"
+  );
+  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
+}
+
 export async function extractDocumentContent(
   buffer: Buffer,
   mimeType: string
@@ -30,6 +51,7 @@ export async function extractDocumentContent(
 
   if (mt === "application/pdf") {
     await ensurePdfjsCanvasGlobals();
+    await ensurePdfjsWorkerSrc();
     const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: new Uint8Array(buffer) });
     try {
