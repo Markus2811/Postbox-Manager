@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Postbox Manager – Architektur</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "neutral",
+      securityLevel: "loose",
+      flowchart: { curve: "basis", padding: 12 },
+    });
+  </script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fafafa;
+      --card: #fff;
+      --text: #18181b;
+      --muted: #52525b;
+      --border: #e4e4e7;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #09090b;
+        --card: #18181b;
+        --text: #fafafa;
+        --muted: #a1a1aa;
+        --border: #27272a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      padding: 2rem 1.25rem 4rem;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      max-width: 56rem;
+      margin-inline: auto;
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.5rem;
+    }
+    .lead {
+      color: var(--muted);
+      font-size: 1rem;
+      margin: 0 0 2rem;
+    }
+    h2 {
+      font-size: 1.2rem;
+      margin: 2.5rem 0 0.75rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    ul { margin: 0.5rem 0; padding-left: 1.25rem; }
+    li { margin: 0.35rem 0; }
+    code {
+      font-size: 0.88em;
+      padding: 0.12em 0.35em;
+      border-radius: 4px;
+      background: var(--border);
+    }
+    .grid {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    @media (min-width: 640px) {
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+    }
+    footer {
+      margin-top: 3rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <h1>Postbox Manager – Architektur</h1>
+  <p class="lead">
+    Übersicht: wo Frontend und Backend laufen, wie Supabase Auth, Postgres mit RLS und Storage
+    zusammenspielen, und wo OpenAI eingebunden ist. Diese Seite liegt im Projekt unter
+    <code>public/architecture.html</code> – lokal z.&nbsp;B. mit <code>npm run dev</code> unter
+    <code>http://localhost:3000/architecture.html</code> öffnen (oder die Datei direkt im Browser, wenn CDN erreichbar ist).
+  </p>
+
+  <h2>Gesamtübersicht (Hosting &amp; Cloud-Grenzen)</h2>
+  <div class="card">
+    <div class="mermaid">
+flowchart TB
+  subgraph BR["Nutzer-Browser"]
+    FE["Next.js UI und React Client"]
+    BC["Supabase Browser-Client Anon Key und Cookies"]
+  end
+
+  subgraph VC["Vercel – Edge / Node"]
+    PR["Proxy Session-Update geschuetzte Routen"]
+    RSC["Server Components und Server Actions Node"]
+    API["API-Routen upload-init analyze ask download Node"]
+  end
+
+  subgraph SB["Supabase Cloud"]
+    AU["Auth GoTrue JWT in Cookies"]
+    PG[("Postgres documents document_metadata RLS")]
+    ST["Storage Bucket documents privat pro User"]
+  end
+
+  subgraph EXT["Extern"]
+    OAI["OpenAI API Analyse und Fragen"]
+  end
+
+  FE --> PR
+  BC --> AU
+  PR --> RSC
+  RSC --> AU
+  RSC --> PG
+  API --> AU
+  API --> PG
+  API --> ST
+  API --> OAI
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <strong>Auf Vercel (deine App)</strong>
+      <ul>
+        <li><strong>Frontend:</strong> gerenderte HTML/React-Seiten, Client-Bundles (u. a. Dashboard, Upload-UI).</li>
+        <li><strong>Backend:</strong> dieselbe Next.js-App – API-Routen und Server-Logik laufen als Serverless-Funktionen (Node), kein eigener dauerhafter Server.</li>
+        <li><strong>Geheimnisse:</strong> <code>OPENAI_API_KEY</code>, optional <code>SUPABASE_SERVICE_ROLE_KEY</code> nur serverseitig; <code>NEXT_PUBLIC_*</code> im Browser.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <strong>Bei Supabase (separates Produkt)</strong>
+      <ul>
+        <li><strong>Datenbank:</strong> Postgres mit <strong>RLS</strong> – jede Zeile an <code>auth.uid()</code> gebunden.</li>
+        <li><strong>Auth:</strong> Login/Session; Cookies werden von Next Middleware und API mit Anon-Key validiert.</li>
+        <li><strong>Storage:</strong> Dateien im Bucket <code>documents</code>; Policies erlauben nur den eigenen Ordner.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Typischer Ablauf: PDF hochladen und auswerten</h2>
+  <div class="card">
+    <div class="mermaid">
+sequenceDiagram
+  participant B as Browser
+  participant V as Vercel API
+  participant S as Supabase Storage
+  participant P as Postgres RLS
+  participant O as OpenAI
+
+  B->>V: POST upload-init JSON Metadaten
+  V->>P: INSERT documents als eingeloggter User
+  V->>S: Signed Upload URL
+  V-->>B: documentId + Token
+  B->>S: PUT Datei direkt zu Storage
+  B->>V: POST analyze documentId
+  V->>S: Download Bytes
+  V->>V: pdf-parse Text
+  V->>O: Chat Completion
+  V->>P: UPDATE documents + UPSERT document_metadata
+  V-->>B: OK Anzeige
+    </div>
+  </div>
+
+  <h2>Frontend vs. Backend (klare Trennung)</h2>
+  <div class="card">
+    <ul>
+      <li><strong>Frontend (sichtbar im Browser):</strong> Navigation, Formulare, Tabellen, Upload-Fortschritt. Nutzt <code>NEXT_PUBLIC_SUPABASE_URL</code> und <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> für direkten Storage-Upload nach signierter URL. <strong>Keine</strong> Service-Role, <strong>kein</strong> OpenAI-Key im Client.</li>
+      <li><strong>Backend (nur Server):</strong> prüft Session (<code>auth.getUser()</code>), spricht mit Postgres und Storage mit derselben User-Session (RLS greift), ruft OpenAI für Analyse/Fragen auf, setzt Metadaten.</li>
+      <li><strong>Datenhaltung:</strong> alle persistenten Daten liegen bei <strong>Supabase</strong> (DB + Storage), nicht auf der Vercel-Festplatte.</li>
+    </ul>
+  </div>
+
+  <h2>RLS kurz erklärt</h2>
+  <div class="card">
+    <ul>
+      <li>Tabellen <code>documents</code> und <code>document_metadata</code>: Policies erlauben <strong>nur Zeilen mit eigener user_id</strong> für Lesen/Schreiben/Löschen.</li>
+      <li>Storage: Objektpfad beginnt mit <code>user_id/…</code>; Policy vergleicht ersten Ordner mit <code>auth.uid()</code>.</li>
+      <li>Die App-Queries filtern oft zusätzlich mit <code>.eq("user_id", …)</code> – RLS bleibt die eigentliche Absicherung in der Cloud.</li>
+    </ul>
+  </div>
+
+  <footer>
+    Stand: generierte Übersicht zum Postbox-Manager-Repo. Diagramme: Mermaid.js (CDN). Bei Fragen zur Produktions-URL: Vercel-Projekt + Supabase-Projekt sind zwei getrennte Cloud-Dienste.
+  </footer>
+</body>
+</html>
