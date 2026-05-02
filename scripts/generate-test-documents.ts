@@ -7,6 +7,10 @@
  *
  * Optional: Umgebungsvariable POSTBOX_TEST_PDF_OUT=absoluter\Pfad setzen.
  *
+ * Zusätzlicher Batch (20 neue, gemischte Dokumente für Upload-/KI-Tests):
+ *   npm run generate-test-pdfs -- --batch=20
+ *   → Windows: %USERPROFILE%\\Downloads\\postbox-example-20-pdfs
+ *
  * Ausführen im Projektordner postbox-manager: npm run generate-test-pdfs
  */
 
@@ -71,6 +75,31 @@ async function buildPdf(lines: string[]): Promise<Uint8Array> {
     y -= LINE;
   }
   return pdf.save();
+}
+
+/** Mehrseitiges PDF (viele Zeilen) – stresst Text-Extraktion / pdf.worker. */
+function linesForMultiPageDoc(): string[] {
+  const header = [
+    "Netz Nordbayern GmbH · Jahresabrechnung Netzentgelte (Muster)",
+    "Absender: Netz Nordbayern GmbH, Netzstraße 7, 90402 Nürnberg",
+    "Empfänger: Beispielhaushalt Sonnenstraße 12 Whg. 3, 32109 Bad Salzuflen",
+    "Abrechnungsjahr: 2025 · Dokumentdatum: 2026-05-02",
+    "Fällig am: 2026-06-18 · Gesamtbetrag: 156,33 EUR",
+    "Hinweis: Alle folgenden Zeilen sind synthetische Positionszeilen ohne reale Zählerstände.",
+    "---",
+  ];
+  const tail = [
+    "---",
+    "Bitte begleichen Sie den Gesamtbetrag unter Angabe der Kundennummer 77-44-NE-2025 bis zum Fälligkeitsdatum.",
+    "Rückfragen nur an die oben genannte Absenderadresse. Keine Barzahlung vor Ort.",
+  ];
+  const mid: string[] = [];
+  for (let i = 1; i <= 95; i++) {
+    mid.push(
+      `Position ${String(i).padStart(3, "0")}: Netznutzung Monat ${((i - 1) % 12) + 1} · Arbeitspreis-Anteil 0,0${(i % 9) + 1} ct/kWh · Menge geschätzt ${(i * 13) % 500} kWh · Zeile nur Demo.`
+    );
+  }
+  return [...header, ...mid, ...tail];
 }
 
 /** PDF mit zwei eingebetteten Rasterbildern (Platzhalter) + Kopfzeilenfarbe + Fließtext. */
@@ -701,14 +730,390 @@ const specs: Spec[] = [
   },
 ];
 
+/** 20 neue, gemischte Muster-PDFs (Rechnungen, Verträge, Briefe, Behörden, mit/ohne Bilder, mehrsprachig nur DE). */
+const specsBatch20: Spec[] = [
+  {
+    filename: "b01-AN_Sonnenstr_Whg3_321096_Heizkostenabrechnung.pdf",
+    lines: [
+      "Wohnungsbaugesellschaft Muster-Süd GmbH · Heizkostenabrechnung 2025",
+      "Objekt: Sonnenstraße · Whg. 3 · 32109 Bad Salzuflen (Musteradresse)",
+      "Absender: Wohnungsbaugesellschaft Muster-Süd GmbH, Verwaltungsweg 4, 32108 Bad Salzuflen",
+      "Empfänger: Beispielmieterin Elena Beispiel",
+      "Abrechnungsdatum: 2026-05-02 · Fällig am: 2026-06-10",
+      "Nachzahlung Heizkosten: 241,88 EUR",
+      "Verbrauchswerte und Aufteilungsschlüssel: siehe beiliegende Übersicht (fiktiv).",
+      "Bitte überweisen Sie den Betrag bis zum Fälligkeitsdatum unter Angabe der Abrechnungsnummer HK-2025-321096.",
+    ],
+    manifest: {
+      filename: "b01-AN_Sonnenstr_Whg3_321096_Heizkostenabrechnung.pdf",
+      expected_document_type: "invoice",
+      expected_sender: "Wohnungsbaugesellschaft Muster-Süd GmbH",
+      expected_amount: 241.88,
+      expected_due_date: "2026-06-10",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b02-Kuendigung_Mietvertrag_Wohnung_2B.pdf",
+    lines: [
+      "Hausverwaltung Linden GmbH · Ordentliche Kündigung Mietverhältnis",
+      "Objekt: Lindenallee 8, 90489 Nürnberg · Einheit 2B",
+      "Absender: Hausverwaltung Linden GmbH, Lindenallee 8a, 90489 Nürnberg",
+      "Empfänger: Max Mustermann",
+      "Kündigungsdatum: 2026-05-18 · Wirksam zum: 2026-08-31",
+      "Die Kündigung erfolgt ordentlich unter Einhaltung der gesetzlichen Frist (Muster).",
+      "Rückfragen bitte schriftlich. Übergabe-Termin wird gesondert mitgeteilt.",
+    ],
+    manifest: {
+      filename: "b02-Kuendigung_Mietvertrag_Wohnung_2B.pdf",
+      expected_document_type: "contract",
+      expected_sender: "Hausverwaltung Linden GmbH",
+      expected_amount: null,
+      expected_due_date: null,
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b03-Buergeramt_Terminbestaetigung.pdf",
+    lines: [
+      "Stadt Musterhausen · Bürgeramt Zentrum",
+      "Terminbestätigung Personalausweis",
+      "Datum: 2026-05-20 · Uhrzeit: 10:40 Uhr · Schalter C3",
+      "Bitte bringen Sie ein aktuelles biometrisches Passfoto und den alten Ausweis mit.",
+      "Die Dienstleistung ist gebührenpflichtig; Gebühr vor Ort: 37,00 EUR (Muster).",
+    ],
+    manifest: {
+      filename: "b03-Buergeramt_Terminbestaetigung.pdf",
+      expected_document_type: "government",
+      expected_sender: "Stadt Musterhausen",
+      expected_amount: 37,
+      expected_due_date: null,
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b04-Inkasso_Mahnung_Stufe2.pdf",
+    lines: [
+      "Inkasso Nord GmbH im Auftrag von: TeleNet AG",
+      "Mahnung Stufe 2 · Aktenzeichen INK-2026-7712",
+      "Offener Hauptforderungsbetrag: 61,20 EUR · Mahngebühr: 15,00 EUR",
+      "Gesamtforderung: 76,20 EUR · Zahlbar bis: 2026-05-30",
+      "Bei Nichtzahlung drohen weitere Kosten und gerichtliche Schritte (Musterformulierung).",
+    ],
+    manifest: {
+      filename: "b04-Inkasso_Mahnung_Stufe2.pdf",
+      expected_document_type: "invoice",
+      expected_sender: "Inkasso Nord GmbH",
+      expected_amount: 76.2,
+      expected_due_date: "2026-05-30",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b05-Sparkasse_Kreditkarte_April2026.pdf",
+    lines: [
+      "Sparkasse Beispielregion · Kreditkartenabrechnung April 2026",
+      "Karteninhaber: Erika Beispiel · Karte endend auf 4412",
+      "Umsatzsumme: 823,44 EUR · Zinsen: 0,00 EUR",
+      "Mindestzahlung: 25,00 EUR · Gesamtfälligkeit: 2026-05-27",
+      "Bitte überweisen Sie mindestens den Mindestbetrag oder den Gesamtbetrag bis zum Fälligkeitsdatum.",
+    ],
+    manifest: {
+      filename: "b05-Sparkasse_Kreditkarte_April2026.pdf",
+      expected_document_type: "bank",
+      expected_sender: "Sparkasse Beispielregion",
+      expected_amount: 823.44,
+      expected_due_date: "2026-05-27",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b06-JobCenter_Eingangsbestaetigung_Antrag.pdf",
+    lines: [
+      "Jobcenter Musterstadt · Eingangsbestätigung",
+      "Antrag auf Arbeitslosengeld II vom 2026-05-14",
+      "Bearbeitungsnummer: ALG2-2026-889144",
+      "Es liegen noch Unterlagen fehlt: Mietbescheinigung aktuell (Musterhinweis).",
+      "Frist für Nachreichung: 2026-06-04",
+    ],
+    manifest: {
+      filename: "b06-JobCenter_Eingangsbestaetigung_Antrag.pdf",
+      expected_document_type: "government",
+      expected_sender: "Jobcenter Musterstadt",
+      expected_amount: null,
+      expected_due_date: "2026-06-04",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b07-FitnessStudio_Vertrag_Premium.pdf",
+    lines: [
+      "FitZone 24 GmbH · Studiovertrag Premium",
+      "Monatliche Studio-Gebühr: 39,90 EUR · Start: 2026-06-01",
+      "Mindestlaufzeit 24 Monate · Kündigung 6 Wochen zum Laufzeitende.",
+      "SEPA-Lastschriftmandat wird mit Vertragsbeginn aktiv (Muster).",
+    ],
+    manifest: {
+      filename: "b07-FitnessStudio_Vertrag_Premium.pdf",
+      expected_document_type: "contract",
+      expected_sender: "FitZone 24 GmbH",
+      expected_amount: 39.9,
+      expected_due_date: null,
+      expected_action_required: false,
+    },
+  },
+  {
+    filename: "b08-Wasserversorgung_Zwischenablesung.pdf",
+    lines: [
+      "Stadtwerke Nordlicht GmbH · Wasserversorgung",
+      "Zwischenablesung Trinkwasser · Zähler-Nr. WZ-998-2211",
+      "Absender: Stadtwerke Nordlicht GmbH, Musterweg 12, 10115 Berlin",
+      "Empfänger: Familie Muster, Gartenstraße 3, 80331 München",
+      "Rechnungsdatum: 2026-05-11 · Fällig am: 2026-05-26",
+      "Zu zahlen: 34,56 EUR (Zwischenrechnung, Muster)",
+    ],
+    manifest: {
+      filename: "b08-Wasserversorgung_Zwischenablesung.pdf",
+      expected_document_type: "invoice",
+      expected_sender: "Stadtwerke Nordlicht GmbH",
+      expected_amount: 34.56,
+      expected_due_date: "2026-05-26",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b09-Techniker_Krankenkasse_Juni.pdf",
+    lines: [
+      "Techniker Krankenkasse · Mitgliederservice",
+      "Beitragsrechnung Juni 2026",
+      "Versicherte Person: Max Mustermann · Beitrag: 215,40 EUR",
+      "Fällig am: 2026-05-29 · Abbuchung per SEPA möglich.",
+    ],
+    manifest: {
+      filename: "b09-Techniker_Krankenkasse_Juni.pdf",
+      expected_document_type: "insurance",
+      expected_sender: "Techniker Krankenkasse",
+      expected_amount: 215.4,
+      expected_due_date: "2026-05-29",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b10-Nachbar_Laerm_hoeflicher_Brief.pdf",
+    lines: [
+      "Privat · Antwort auf Ihre Nachricht vom 2026-05-01",
+      "Sehr geehrte Nachbarin, sehr geehrter Nachbar,",
+      "wir bitten höflich, die Musikwiedergabe nach 22:00 Uhr leiser zu stellen (Musterformulierung).",
+      "Es handelt sich um keine offizielle Behördenmitteilung, sondern um eine private Nachbarschaftskorrespondenz.",
+      "Mit freundlichen Grüßen · Familie Beispiel, Musterweg 5, 10115 Berlin",
+    ],
+    manifest: {
+      filename: "b10-Nachbar_Laerm_hoeflicher_Brief.pdf",
+      expected_document_type: "other",
+      expected_sender: "Familie Beispiel",
+      expected_amount: null,
+      expected_due_date: null,
+      expected_action_required: false,
+    },
+  },
+  {
+    filename: "b11-Gemeinde_Hundesteuer_2026.pdf",
+    lines: [
+      "Gemeinde Beispielort · Finanzamt Gemeinde",
+      "Bescheid Hundesteuer 2026 · Steuernummer ST-2026-DOG-01",
+      "Steuerpflichtiger: Erika Beispiel · Hund: Luna (Mustername)",
+      "Jahressteuer: 96,00 EUR · fällig am: 2026-06-20",
+      "Widerspruchsfrist: 1 Monat nach Zugang (Muster).",
+    ],
+    manifest: {
+      filename: "b11-Gemeinde_Hundesteuer_2026.pdf",
+      expected_document_type: "government",
+      expected_sender: "Gemeinde Beispielort",
+      expected_amount: 96,
+      expected_due_date: "2026-06-20",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b12-Vermieter_Schoenheitsreparaturen.pdf",
+    lines: [
+      "Privat · Schreiben zum Auszug",
+      "Betreff: Vereinbarung zu Schönheitsreparaturen gemäß Mietvertrag",
+      "Wir bitten um Terminabstimmung für Übergabe und Besichtigung bis 2026-06-08.",
+      "Es werden keine konkreten Geldforderungen in diesem Schreiben geltend gemacht (Muster).",
+    ],
+    manifest: {
+      filename: "b12-Vermieter_Schoenheitsreparaturen.pdf",
+      expected_document_type: "contract",
+      expected_sender: "Privat",
+      expected_amount: null,
+      expected_due_date: "2026-06-08",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b13-Kleinanzeigen_Kaeuferschutz_Rechnung.pdf",
+    lines: [
+      "OnlineMarkt Kleinanzeigen GmbH · Käuferschutz-Gebühr",
+      "Transaktion K-2026-441900 · Artikel: Fahrrad gebraucht (Muster)",
+      "Gebühr Käuferschutz: 5,49 EUR · fällig am: 2026-05-24",
+      "Bitte zahlen Sie über den bereitgestellten Zahlungslink (Muster).",
+    ],
+    manifest: {
+      filename: "b13-Kleinanzeigen_Kaeuferschutz_Rechnung.pdf",
+      expected_document_type: "invoice",
+      expected_sender: "OnlineMarkt Kleinanzeigen GmbH",
+      expected_amount: 5.49,
+      expected_due_date: "2026-05-24",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b14-Stromanbieter_Wechselbonus_80EUR.pdf",
+    lines: [
+      "ÖkoStrom Wechsel GmbH · Bonuszahlung",
+      "Aktion Wechselbonus 2026 · Kundennummer OSW-778899",
+      "Auszahlungsbetrag: 80,00 EUR · Auszahlung bis: 2026-06-30",
+      "Voraussetzung: Vertragslaufzeit von mindestens 12 Monaten (Musterbedingung).",
+    ],
+    manifest: {
+      filename: "b14-Stromanbieter_Wechselbonus_80EUR.pdf",
+      expected_document_type: "invoice",
+      expected_sender: "ÖkoStrom Wechsel GmbH",
+      expected_amount: 80,
+      expected_due_date: "2026-06-30",
+      expected_action_required: false,
+    },
+  },
+  {
+    filename: "b15-Mehrseitig_Netzentgelte_Langtext.pdf",
+    lines: linesForMultiPageDoc(),
+    manifest: {
+      filename: "b15-Mehrseitig_Netzentgelte_Langtext.pdf",
+      expected_document_type: "invoice",
+      expected_sender: "Netz Nordbayern GmbH",
+      expected_amount: 156.33,
+      expected_due_date: "2026-06-18",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b16-Versicherung_Leistungsplan_mit_Bild.pdf",
+    withImages: true,
+    imageFrames: { frameA: [0.91, 0.95, 0.98], frameB: [0.94, 0.92, 0.9] },
+    lines: [
+      "SichereWelt Versicherung AG · Leistungsplan Hausrat",
+      "Police HR-2024-009988 · Stand Information: 2026-05-21",
+      "Die Grafiken oben sind synthetische Platzhalter (keine echten Fotos von Räumen).",
+      "Selbstbeteiligung je Schadenfall: 150,00 EUR · jährliche Anpassung zum 01.01. (Muster).",
+    ],
+    manifest: {
+      filename: "b16-Versicherung_Leistungsplan_mit_Bild.pdf",
+      expected_document_type: "insurance",
+      expected_sender: "SichereWelt Versicherung AG",
+      expected_amount: 150,
+      expected_due_date: null,
+      expected_action_required: false,
+    },
+  },
+  {
+    filename: "b17-Arbeitsvertrag_Entwurf_mit_Bild.pdf",
+    withImages: true,
+    imageFrames: { frameA: [0.93, 0.9, 0.96], frameB: [0.88, 0.94, 0.97] },
+    lines: [
+      "TechWork Solutions GmbH · Arbeitsvertrag (Entwurf)",
+      "Position: Fachinformatiker Anwendungsentwicklung · Gehalt brutto 4.200,00 EUR monatlich",
+      "Beginn vorgesehen: 2026-07-01 · Probezeit 6 Monate (Muster).",
+      "Die Bildplatzhalter symbolisieren Unterschrift und Personalbogen (keine echten Daten).",
+    ],
+    manifest: {
+      filename: "b17-Arbeitsvertrag_Entwurf_mit_Bild.pdf",
+      expected_document_type: "contract",
+      expected_sender: "TechWork Solutions GmbH",
+      expected_amount: 4200,
+      expected_due_date: null,
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b18-Bank_Wertpapierdepot_Uebersicht_mit_Bild.pdf",
+    withImages: true,
+    imageFrames: { frameA: [0.96, 0.93, 0.91], frameB: [0.9, 0.96, 0.94] },
+    lines: [
+      "Nordbank AG · Depotübersicht Mai 2026",
+      "Depotwert laut Marktpreisen: 18.932,11 EUR (Musterwerte, keine Anlageberatung).",
+      "Die Abbildungen sind symbolische Charts (Platzhalter, keine echten Kursdaten).",
+      "Es ist keine Zahlung fällig; Hinweis auf steuerliche Meldepflichten (Muster).",
+    ],
+    manifest: {
+      filename: "b18-Bank_Wertpapierdepot_Uebersicht_mit_Bild.pdf",
+      expected_document_type: "bank",
+      expected_sender: "Nordbank AG",
+      expected_amount: null,
+      expected_due_date: null,
+      expected_action_required: false,
+    },
+  },
+  {
+    filename: "b19-Finanzamt_Vorauszahlung_Q3_mit_Bild.pdf",
+    withImages: true,
+    imageFrames: { frameA: [0.92, 0.96, 0.93], frameB: [0.95, 0.91, 0.97] },
+    lines: [
+      "Finanzamt Musterstadt · Umsatzsteuer-Vorauszahlung Q3/2026",
+      "Vorauszahlungsbetrag: 1.890,00 EUR · fällig am: 2026-09-10",
+      "Anlagen symbolisieren Bescheid und Zahlschein (synthetische Platzhalter).",
+      "Bitte überweisen Sie rechtzeitig unter Angabe der ELSTER-Referenz (Muster).",
+    ],
+    manifest: {
+      filename: "b19-Finanzamt_Vorauszahlung_Q3_mit_Bild.pdf",
+      expected_document_type: "tax",
+      expected_sender: "Finanzamt Musterstadt",
+      expected_amount: 1890,
+      expected_due_date: "2026-09-10",
+      expected_action_required: true,
+    },
+  },
+  {
+    filename: "b20-Kurzbrief_Versicherung_ohne_Betrag_mit_Bild.pdf",
+    withImages: true,
+    imageFrames: { frameA: [0.97, 0.95, 0.92], frameB: [0.91, 0.93, 0.98] },
+    lines: [
+      "WohnSicher Hausratversicherung · Kurzinfo",
+      "Ihre Police HS-8899 bleibt unverändert aktiv. Keine Zahlung in diesem Monat.",
+    ],
+    manifest: {
+      filename: "b20-Kurzbrief_Versicherung_ohne_Betrag_mit_Bild.pdf",
+      expected_document_type: "insurance",
+      expected_sender: "WohnSicher Hausratversicherung",
+      expected_amount: null,
+      expected_due_date: null,
+      expected_action_required: false,
+    },
+  },
+];
+
+function resolveOutputDirBatch20(): string {
+  const custom = process.env.POSTBOX_TEST_PDF_OUT?.trim();
+  if (custom) return path.resolve(custom);
+  if (process.platform === "win32") {
+    const profile = process.env.USERPROFILE;
+    if (profile) {
+      return path.join(profile, "Downloads", "postbox-example-20-pdfs");
+    }
+  }
+  return path.join(os.homedir(), "Downloads", "postbox-example-20-pdfs");
+}
+
 async function main() {
-  const outDir = resolveOutputDir();
+  const batch20 = process.argv.includes("--batch=20") || process.argv.includes("--20");
+  const activeSpecs = batch20 ? specsBatch20 : specs;
+  const outDir = batch20 ? resolveOutputDirBatch20() : resolveOutputDir();
   fs.mkdirSync(outDir, { recursive: true });
   const manifest: ManifestEntry[] = [];
 
   const defaultFrames = { frameA: [0.93, 0.95, 0.98] as [number, number, number], frameB: [0.95, 0.92, 0.96] as [number, number, number] };
 
-  for (const spec of specs) {
+  for (const spec of activeSpecs) {
     const bytes = spec.withImages
       ? await buildPdfWithImages(spec.lines, spec.imageFrames ?? defaultFrames)
       : await buildPdf(spec.lines);
@@ -723,7 +1128,7 @@ async function main() {
   );
 
   const abs = path.resolve(outDir);
-  console.log(`OK: ${specs.length} PDFs + manifest.json`);
+  console.log(`OK: ${activeSpecs.length} PDFs + manifest.json${batch20 ? " (Batch --batch=20)" : ""}`);
   console.log(`Ordner (absolut): ${abs}`);
 }
 

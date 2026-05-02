@@ -22,6 +22,7 @@
     "supabase:status": "npx supabase status",
     "supabase:reset": "npx supabase db reset",
     "generate-test-pdfs": "npx tsx scripts/generate-test-documents.ts",
+    "generate-test-pdfs-20": "npx tsx scripts/generate-test-documents.ts --batch=20",
     "loadtest:four": "npx tsx --env-file=.env.local scripts/loadtest-upload-analyze.ts",
     "admin:delete-docs": "node --env-file=.env.local scripts/delete-documents-by-email.mjs",
     "test:auth": "node --env-file=.env.local scripts/test-auth-signup-login.mjs"
