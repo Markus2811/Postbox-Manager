@@ -16,6 +16,29 @@ export const maxDuration = 120;
 
 const FETCH_LIMIT = 400;
 
+const ASK_DOCUMENT_METADATA_CORE = `
+        sender,
+        summary,
+        due_date,
+        document_date,
+        document_type,
+        action_required,
+        action_description,
+        amount,
+        currency,
+        raw_ai_json`;
+
+function isMissingExtractedTextSelectError(message: string): boolean {
+  const m = message.toLowerCase();
+  if (!m.includes("extracted_text")) return false;
+  return (
+    m.includes("does not exist") ||
+    m.includes("could not find") ||
+    m.includes("schema cache") ||
+    m.includes("unknown column")
+  );
+}
+
 type Body = { question?: string };
 
 export async function POST(request: Request) {
@@ -40,7 +63,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });
   }
 
-  const selectFull = `
+  const selectFullWithExtract = `
       id,
       display_name,
       category,
@@ -48,55 +71,75 @@ export async function POST(request: Request) {
       original_filename,
       workspace_bucket,
       document_metadata (
-        sender,
-        summary,
-        due_date,
-        document_date,
-        document_type,
-        action_required,
-        action_description,
-        amount,
-        currency,
-        raw_ai_json,
+        ${ASK_DOCUMENT_METADATA_CORE},
         extracted_text
       )
     `;
-  const selectBase = `
+  const selectFullNoExtract = `
+      id,
+      display_name,
+      category,
+      created_at,
+      original_filename,
+      workspace_bucket,
+      document_metadata (
+        ${ASK_DOCUMENT_METADATA_CORE}
+      )
+    `;
+  const selectBaseWithExtract = `
       id,
       display_name,
       category,
       created_at,
       original_filename,
       document_metadata (
-        sender,
-        summary,
-        due_date,
-        document_date,
-        document_type,
-        action_required,
-        action_description,
-        amount,
-        currency,
-        raw_ai_json,
+        ${ASK_DOCUMENT_METADATA_CORE},
         extracted_text
       )
     `;
+  const selectBaseNoExtract = `
+      id,
+      display_name,
+      category,
+      created_at,
+      original_filename,
+      document_metadata (
+        ${ASK_DOCUMENT_METADATA_CORE}
+      )
+    `;
 
-  const first = await supabase
+  let first = await supabase
     .from("documents")
-    .select(selectFull)
+    .select(selectFullWithExtract)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(FETCH_LIMIT);
 
+  if (first.error && isMissingExtractedTextSelectError(first.error.message ?? "")) {
+    first = (await supabase
+      .from("documents")
+      .select(selectFullNoExtract)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(FETCH_LIMIT)) as typeof first;
+  }
+
   let rawRows: AskDocRow[];
   if (first.error?.message?.includes("workspace_bucket")) {
-    const second = await supabase
+    let second = await supabase
       .from("documents")
-      .select(selectBase)
+      .select(selectBaseWithExtract)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(FETCH_LIMIT);
+    if (second.error && isMissingExtractedTextSelectError(second.error.message ?? "")) {
+      second = (await supabase
+        .from("documents")
+        .select(selectBaseNoExtract)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(FETCH_LIMIT)) as typeof second;
+    }
     if (second.error) {
       return NextResponse.json({ error: second.error.message }, { status: 500 });
     }
