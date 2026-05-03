@@ -7,11 +7,13 @@ type Props = {
   documentId: string;
   /** Wenn gesetzt: Hinweis, dass Titel/Kategorie nicht überschrieben werden */
   userEditedAt: string | null | undefined;
+  /** Zusätzliche Klassen für den Haupt-Button (z. B. Layout). */
+  className?: string;
 };
 
 const PROGRESS_CAP_LOADING = 97;
 
-export function DocumentReanalyzeButton({ documentId, userEditedAt }: Props) {
+export function DocumentReanalyzeButton({ documentId, userEditedAt, className }: Props) {
   const router = useRouter();
   const [phase, setPhase] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export function DocumentReanalyzeButton({ documentId, userEditedAt }: Props) {
         type="button"
         onClick={() => void onClick()}
         disabled={busy}
-        className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className={`inline-flex min-h-[2.75rem] items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 ${className ?? ""}`}
       >
         {busy ? (
           <>
