@@ -5,6 +5,7 @@ import {
   filterAskRows,
   formatAskContextBlock,
   nextCalendarWeekMonSun,
+  pickRelevantAskSourceIds,
   type AskDocRow,
 } from "@/lib/documents/ask-helpers";
 import { humanizeDocumentTitle } from "@/lib/documents/humanize-title";
@@ -41,6 +42,32 @@ function isMissingExtractedTextSelectError(message: string): boolean {
 }
 
 type Body = { question?: string };
+
+const DOC_ID_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isLikelyDocumentUuid(id: string): boolean {
+  return DOC_ID_UUID_RE.test(id.trim());
+}
+
+function parseAskModelJson(content: string): { answer: string; usedDocumentIds: string[] } | null {
+  let t = content.trim();
+  if (t.startsWith("```")) {
+    t = t.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?\s*```\s*$/i, "");
+  }
+  try {
+    const o = JSON.parse(t) as { answer?: unknown; usedDocumentIds?: unknown };
+    if (typeof o.answer !== "string" || !o.answer.trim()) return null;
+    const raw = Array.isArray(o.usedDocumentIds) ? o.usedDocumentIds : [];
+    const usedDocumentIds = [
+      ...new Set(
+        raw.filter((x): x is string => typeof x === "string" && isLikelyDocumentUuid(x)).map((x) => x.trim())
+      ),
+    ];
+    return { answer: o.answer.trim(), usedDocumentIds };
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(request: Request) {
   let body: Body;
@@ -171,10 +198,6 @@ export async function POST(request: Request) {
   }
 
   const forContext = filtered.length > 0 ? filtered : rawRows.slice(0, 150);
-  const sources = forContext.map((r) => ({
-    id: r.id,
-    title: humanizeDocumentTitle(r.display_name, r.original_filename),
-  }));
   const fullTextBudget = { remaining: ASK_CONTEXT_EXTRACT_TOTAL };
   const blocks = forContext.map((r, i) => formatAskContextBlock(r, i, fullTextBudget));
 
@@ -194,14 +217,19 @@ export async function POST(request: Request) {
   const completion = await openai.chat.completions.create({
     model,
     temperature: 0.25,
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
         content:
-          "Du bist ein Assistent für eine private Postbox. Die Nutzerfrage bezieht sich auf die mitgelieferte Dokumentliste (Metadaten, Kurzinfo, ggf. Notiz beim Erledigen) und pro Dokument auf einen Auszug aus dem gespeicherten maschinenlesbaren Volltext (Extrakt), sofern vorhanden. " +
-          "Nutze den Volltext-Auszug für Detailfragen (z. B. Sitzplatz, Flugnummer, Adressen im Fließtext). Wenn der Extrakt fehlt, gekürzt wurde oder das Kontextlimit weitere Volltexte ausließ, sage das klar. " +
-          "Antworte nur auf Basis dieser Daten. Wenn etwas unklar ist oder nicht in den Daten steht, sage das. " +
-          "Bei Listen nenne konkrete Dokumenttitel oder Absender aus den Daten. Kurz und auf Deutsch, keine erfundenen Details.",
+          "Du bist ein Assistent für eine private Postbox. Pro Dokument gibt es im Kontext eine Zeile \"ID: <uuid>\", Metadaten, ggf. Notiz beim Erledigen und einen Auszug aus dem gespeicherten Volltext (Extrakt). " +
+          "Du antwortest ausschließlich mit einem JSON-Objekt mit genau zwei Schlüsseln: " +
+          "\"answer\" (String, deine Antwort an den Nutzer auf Deutsch, kurz und sachlich) und " +
+          "\"usedDocumentIds\" (Array von Strings: nur die UUIDs aus den \"ID:\"-Zeilen der Dokumente, die du zur Beantwortung wirklich ausgewertet hast). " +
+          "Nur UUIDs aus diesem Kontext — keine erfundenen IDs. " +
+          "Wenn die Frage sich eindeutig auf ein einzelnes Dokument bezieht (z. B. Bordkarte, ein Vertrag), enthält usedDocumentIds genau dieses eine Dokument — nicht die übrigen Dokumente, die nur im Kontext standen. " +
+          "Bei kombinierten Fragen nur die wirklich nötigen Dokumente auflisten. Wenn keine Quelle passt: usedDocumentIds = []. " +
+          "Nutze den Volltext für Detailfragen (Sitzplatz, Flugnummer, Beträge). Wenn der Extrakt fehlt oder gekürzt ist, sage das in answer. Keine erfundenen Details.",
       },
       {
         role: "user",
@@ -210,10 +238,31 @@ export async function POST(request: Request) {
     ],
   });
 
-  const answer = completion.choices[0]?.message?.content?.trim();
-  if (!answer) {
+  const rawContent = completion.choices[0]?.message?.content?.trim();
+  if (!rawContent) {
     return NextResponse.json({ error: "Leere Modell-Antwort" }, { status: 500 });
   }
 
-  return NextResponse.json({ answer, sources });
+  const parsed = parseAskModelJson(rawContent);
+  if (!parsed) {
+    return NextResponse.json({ error: "Antwort konnte nicht verarbeitet werden" }, { status: 500 });
+  }
+
+  const validIds = new Set(forContext.map((r) => r.id));
+  let sourceIds = parsed.usedDocumentIds.filter((id) => validIds.has(id));
+
+  if (sourceIds.length === 0) {
+    sourceIds = pickRelevantAskSourceIds(forContext, question, parsed.answer);
+  }
+
+  const rowById = new Map(forContext.map((r) => [r.id, r]));
+  const sources = sourceIds
+    .map((id) => {
+      const r = rowById.get(id);
+      if (!r) return null;
+      return { id: r.id, title: humanizeDocumentTitle(r.display_name, r.original_filename) };
+    })
+    .filter((x): x is { id: string; title: string } => x != null);
+
+  return NextResponse.json({ answer: parsed.answer, sources });
 }

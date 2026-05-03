@@ -80,8 +80,8 @@ export function FragenClient() {
                 Berücksichtigte Dokumente
               </p>
               <p className="mt-1 text-xs text-zinc-600">
-                Die Antwort stützt sich auf Metadaten und Textauszüge aus genau diesen Dokumenten (Kontext
-                dieser Anfrage). Zum Nachlesen im Original:
+                Für diese Antwort relevante Quellen aus deiner Bibliothek (vom Modell benannt bzw. bei Bedarf
+                automatisch eingegrenzt). Zum Nachlesen im Original:
               </p>
               <ul className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
                 {sources.map((s) => (

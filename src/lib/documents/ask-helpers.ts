@@ -153,3 +153,135 @@ export function formatAskContextBlock(
 
   return parts.join("\n") + extractBlock;
 }
+
+const ASK_DE_STOPWORDS = new Set([
+  "der",
+  "die",
+  "das",
+  "und",
+  "oder",
+  "für",
+  "mit",
+  "von",
+  "zur",
+  "zum",
+  "eine",
+  "einen",
+  "einem",
+  "einer",
+  "nicht",
+  "habe",
+  "haben",
+  "ihr",
+  "ihre",
+  "sich",
+  "auf",
+  "ist",
+  "sind",
+  "wie",
+  "was",
+  "welche",
+  "welchen",
+  "welcher",
+  "welches",
+  "den",
+  "dem",
+  "des",
+  "hat",
+  "hast",
+  "ein",
+  "im",
+  "in",
+  "zu",
+  "bei",
+  "mir",
+  "mich",
+  "man",
+]);
+
+/** Begriffe aus Frage + Antwort für heuristische Quellenauswahl (Fallback). */
+export function extractAskSearchTerms(question: string, answer: string): string[] {
+  const raw = `${question}\n${answer}`;
+  const terms = new Set<string>();
+  const push = (s: string) => {
+    const t = s.trim();
+    if (t.length < 2) return;
+    const low = t.toLowerCase();
+    if (low.length >= 3 && ASK_DE_STOPWORDS.has(low)) return;
+    terms.add(t.length >= 3 ? low : t);
+  };
+  for (const w of raw.split(/\W+/u)) {
+    if (w.length >= 3) push(w);
+  }
+  for (const m of raw.matchAll(/\b[A-Z]{2}\d{3,4}\b/gi)) {
+    terms.add(m[0].toUpperCase());
+    terms.add(m[0].toLowerCase());
+  }
+  for (const m of raw.matchAll(/\b(\d{1,2}[A-Fa-f])\b/g)) {
+    terms.add(m[1].toUpperCase());
+    terms.add(m[1].toLowerCase());
+  }
+  for (const m of raw.matchAll(/\d{4}-\d{2}-\d{2}/g)) {
+    terms.add(m[0]);
+  }
+  return [...terms];
+}
+
+/** Durchsuchbarer Text pro Dokument (Metadaten + Auszug Volltext). */
+export function haystackForAskRelevance(r: AskDocRow): string {
+  const m = metaOf(r);
+  const extract = storedExtractedText(m);
+  const note = m?.raw_ai_json ? completionNoteFromRawAi(m.raw_ai_json) : null;
+  const parts = [
+    r.display_name,
+    r.original_filename,
+    r.category,
+    m?.sender,
+    m?.summary,
+    m?.action_description,
+    m?.document_type,
+    note,
+    extract ? extract.slice(0, 24_000) : null,
+  ];
+  return parts
+    .filter((p): p is string => typeof p === "string" && p.length > 0)
+    .join("\n")
+    .toLowerCase();
+}
+
+/**
+ * Heuristische Auswahl relevanter Dokument-IDs, falls das Modell keine nutzbaren IDs liefert.
+ * Nutzt Überlappung von Frage+Antwort-Termen mit Dokumentinhalt.
+ */
+export function pickRelevantAskSourceIds(
+  rows: AskDocRow[],
+  question: string,
+  answer: string,
+  maxResults = 6
+): string[] {
+  const terms = extractAskSearchTerms(question, answer);
+  if (terms.length === 0 || rows.length === 0) return [];
+
+  const scored = rows.map((r) => {
+    const h = haystackForAskRelevance(r);
+    let s = 0;
+    for (const t of terms) {
+      const needle = t.toLowerCase();
+      if (needle.length < 2) continue;
+      if (h.includes(needle)) {
+        s += needle.length >= 8 ? 5 : needle.length >= 5 ? 3 : 2;
+      }
+    }
+    return { id: r.id, s };
+  });
+  scored.sort((a, b) => b.s - a.s);
+  const top = scored[0]?.s ?? 0;
+  if (top <= 0) return [];
+
+  const threshold = Math.max(2, top * 0.35);
+  const out: string[] = [];
+  for (const x of scored) {
+    if (x.s >= threshold && out.length < maxResults) out.push(x.id);
+  }
+  return out;
+}
