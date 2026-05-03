@@ -17,6 +17,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:security": "node --test ./scripts/security/middleware-routes.test.mjs",
+    "test:naming": "npx tsx scripts/document-naming-selftest.ts",
     "supabase:start": "npx supabase start",
     "supabase:stop": "npx supabase stop",
     "supabase:status": "npx supabase status",
@@ -25,6 +26,7 @@
     "generate-test-pdfs-20": "npx tsx scripts/generate-test-documents.ts --batch=20",
     "loadtest:four": "npx tsx --env-file=.env.local scripts/loadtest-upload-analyze.ts",
     "admin:delete-docs": "node --env-file=.env.local scripts/delete-documents-by-email.mjs",
+    "admin:delete-one": "node --env-file=.env.local scripts/delete-one-document.mjs",
     "test:auth": "node --env-file=.env.local scripts/test-auth-signup-login.mjs"
   },
   "dependencies": {

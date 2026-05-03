@@ -18,7 +18,7 @@ import * as path from "path";
 import { performance } from "perf_hooks";
 import { analyzeWithOpenAI } from "../src/lib/ai/analyze-with-openai";
 import { categoryFromDocumentType } from "../src/lib/documents/categories";
-import { buildDisplayName } from "../src/lib/documents/display-name";
+import { buildDocumentNamesFromAnalysis } from "../src/lib/documents/document-naming";
 import { extractDocumentContent } from "../src/lib/documents/extract-content";
 
 const NEW_FILES = [
@@ -370,12 +370,13 @@ async function pipelineOne(
   if (selErr || !docRow) throw selErr ?? new Error("Dokument nicht lesbar");
 
   const category = categoryFromDocumentType(analysis.document_type);
-  const displayName = buildDisplayName({
+  const names = buildDocumentNamesFromAnalysis({
+    documentType: analysis.document_type,
+    categoryLabel: category,
+    sender: analysis.sender,
+    summary: analysis.summary,
     documentDate: analysis.document_date,
     uploadDate: new Date(docRow.created_at),
-    sender: analysis.sender,
-    documentType: analysis.document_type,
-    summary: analysis.summary,
     extractedText: extracted.text,
   });
 
@@ -383,7 +384,8 @@ async function pipelineOne(
   const { error: upDocErr } = await supabase
     .from("documents")
     .update({
-      display_name: displayName,
+      display_name: names.display_name,
+      internal_name: names.machine_name,
       category,
       status: "processed",
     })

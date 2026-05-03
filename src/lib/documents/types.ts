@@ -19,6 +19,8 @@ export type DocumentWorkspaceBucket = "inbox" | "done";
 export type DocumentWithMetadata = {
   id: string;
   display_name: string | null;
+  /** Deterministischer Maschinename (Unterstriche), siehe document-naming.ts */
+  internal_name?: string | null;
   category: string | null;
   status: string;
   original_filename: string;

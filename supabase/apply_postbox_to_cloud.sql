@@ -10,6 +10,7 @@ create table if not exists public.documents (
   mime_type text not null,
   file_size bigint,
   display_name text,
+  internal_name text,
   category text,
   status text not null default 'uploaded',
   workspace_bucket text not null default 'inbox',
@@ -198,6 +199,8 @@ alter table public.documents
 create unique index if not exists documents_user_content_hash_uidx
   on public.documents (user_id, content_hash)
   where content_hash is not null;
+
+alter table public.documents add column if not exists internal_name text;
 
 -- Virtuelle Ablage / Bearbeitungszeit (idempotent für ältere DBs)
 alter table public.documents add column if not exists workspace_bucket text;

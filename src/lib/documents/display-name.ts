@@ -1,13 +1,27 @@
-import { normalizeDocumentNames, type NormalizeDocumentNameInput } from "@/lib/documents/normalize-document-name";
+import {
+  buildDocumentNamesFromAnalysis,
+  type BuildDocumentNamesFromAnalysisInput,
+} from "@/lib/documents/document-naming";
 
-export type BuildDisplayNameInput = NormalizeDocumentNameInput;
+export type BuildDisplayNameInput = BuildDocumentNamesFromAnalysisInput;
 
 /**
- * Persistierter Anzeigename (maschinenlesbar, Unterstriche) für `documents.display_name`.
- * UI: `normalizeDocumentNames(…).display_name` oder `humanizeDocumentTitle(display_name, …)`.
+ * User-facing title for `documents.display_name` (human-readable, no underscores).
  */
 export function buildDisplayName(input: BuildDisplayNameInput): string {
-  return normalizeDocumentNames(input).machine_name;
+  return buildDocumentNamesFromAnalysis(input).display_name;
 }
 
+export function buildMachineName(input: BuildDisplayNameInput): string {
+  return buildDocumentNamesFromAnalysis(input).machine_name;
+}
+
+export {
+  buildDocumentNamesFromAnalysis,
+  cleanSender,
+  cleanTopic,
+  generateDocumentNames,
+  looksLikeMachineTitle,
+  normalizeCategory,
+} from "@/lib/documents/document-naming";
 export { normalizeDocumentNames } from "@/lib/documents/normalize-document-name";

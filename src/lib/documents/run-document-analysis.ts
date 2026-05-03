@@ -1,7 +1,7 @@
 import type { DocumentAnalysis } from "@/lib/ai/document-analysis-schema";
 import { analyzeWithOpenAI } from "@/lib/ai/analyze-with-openai";
 import { categoryFromDocumentType } from "@/lib/documents/categories";
-import { buildDisplayName } from "@/lib/documents/display-name";
+import { buildDocumentNamesFromAnalysis } from "@/lib/documents/document-naming";
 import { isMissingDocumentWorkspaceColumns } from "@/lib/documents/document-workspace-fallback";
 import { extractDocumentContent } from "@/lib/documents/extract-content";
 import { renderPdfFirstPagePngBase64 } from "@/lib/documents/render-pdf-first-page-png";
@@ -10,6 +10,18 @@ import {
   POSTBOX_JSON_KEY,
 } from "@/lib/documents/workspace-mvp";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+/** Produktions-DB ohne Migration: PostgREST meldet fehlende Spalte internal_name. */
+function isMissingInternalNameColumn(message: string): boolean {
+  const m = message.toLowerCase();
+  if (!m.includes("internal_name")) return false;
+  return (
+    m.includes("does not exist") ||
+    m.includes("could not find") ||
+    m.includes("schema cache") ||
+    m.includes("unknown column")
+  );
+}
 
 /** Produktions-DB ohne Migration: PostgREST/Postgres meldet fehlende Spalte extracted_text. */
 function isMissingExtractedTextColumn(message: string): boolean {
@@ -138,14 +150,16 @@ export async function runDocumentAnalysis(
     const extractedTextForDb = combinedExtract.slice(0, MAX_STORED_EXTRACTED);
 
     const category = categoryFromDocumentType(analysis.document_type);
-    const displayName = buildDisplayName({
+    const names = buildDocumentNamesFromAnalysis({
+      documentType: analysis.document_type,
+      categoryLabel: category,
+      sender: analysis.sender,
+      summary: analysis.summary,
       documentDate: analysis.document_date,
       uploadDate: new Date(doc.created_at),
-      sender: analysis.sender,
-      documentType: analysis.document_type,
-      summary: analysis.summary,
       extractedText: combinedExtract,
     });
+    const displayName = names.display_name;
 
     const docUpdate: Record<string, unknown> = {
       status: "processed",
@@ -153,13 +167,23 @@ export async function runDocumentAnalysis(
     if (!preserveUserDocumentFields) {
       docUpdate.display_name = displayName;
       docUpdate.category = category;
+      docUpdate.internal_name = names.machine_name;
     }
 
-    const { error: updateDocError } = await supabase
-      .from("documents")
-      .update(docUpdate)
-      .eq("id", doc.id)
-      .eq("user_id", userId);
+    let updateDocError = (
+      await supabase.from("documents").update(docUpdate).eq("id", doc.id).eq("user_id", userId)
+    ).error;
+
+    if (updateDocError && isMissingInternalNameColumn(updateDocError.message ?? "")) {
+      const { internal_name: _i, ...withoutInternal } = docUpdate;
+      updateDocError = (
+        await supabase
+          .from("documents")
+          .update(withoutInternal)
+          .eq("id", doc.id)
+          .eq("user_id", userId)
+      ).error;
+    }
 
     if (updateDocError) {
       throw updateDocError;
