@@ -94,9 +94,6 @@ export function DocumentsReadonlyTable({ rows }: { rows: EditableGridRow[] }) {
             <th className="whitespace-nowrap border-b border-zinc-200 px-2 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-600">
               Notiz (Erledigt)
             </th>
-            <th className="whitespace-nowrap border-b border-zinc-200 px-2 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-600">
-              Vertrauen
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -105,10 +102,6 @@ export function DocumentsReadonlyTable({ rows }: { rows: EditableGridRow[] }) {
             const amt =
               m.amount?.trim() && !Number.isNaN(Number(m.amount.replace(",", ".")))
                 ? formatCurrency(Number(m.amount.replace(",", ".")), m.currency || "EUR")
-                : "—";
-            const confPct =
-              row.confidence != null && !Number.isNaN(Number(row.confidence))
-                ? `${Math.round(Number(row.confidence) * 100)} %`
                 : "—";
             const sum = m.summary?.trim() ?? "";
             const act = m.action_description?.trim() ?? "";
@@ -164,7 +157,6 @@ export function DocumentsReadonlyTable({ rows }: { rows: EditableGridRow[] }) {
                 <Cell title={act}>{truncate(act, 120) || "—"}</Cell>
                 <Cell title={sum}>{truncate(sum, 160) || "—"}</Cell>
                 <Cell title={note}>{truncate(note, 120) || "—"}</Cell>
-                <Cell className="whitespace-nowrap">{confPct}</Cell>
               </tr>
             );
           })}
