@@ -18,6 +18,8 @@ export const documentAnalysisSchema = z.object({
   action_required: z.boolean(),
   action_description: z.string().nullable(),
   confidence: z.number().min(0).max(1),
+  /** Bei Fotos: alles Lesbare (Tabellen, handschriftliche Zahlen) für Fragen & Volltext. */
+  image_transcript: z.string().max(120_000).nullish(),
 });
 
 export type DocumentAnalysis = z.infer<typeof documentAnalysisSchema>;

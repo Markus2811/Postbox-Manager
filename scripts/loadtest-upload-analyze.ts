@@ -391,7 +391,12 @@ async function pipelineOne(
   if (upDocErr) throw upDocErr;
 
   const rawPayload = { ...analysis } as Record<string, unknown>;
-  const extractedForDb = extracted.text.slice(0, 64_000);
+  delete rawPayload.image_transcript;
+  const transcript = (analysis.image_transcript ?? "").trim();
+  const extractedForDb = [extracted.text.trim(), transcript]
+    .filter(Boolean)
+    .join("\n\n---\n\n")
+    .slice(0, 64_000);
 
   const { error: metaErr } = await supabase.from("document_metadata").upsert(
     {

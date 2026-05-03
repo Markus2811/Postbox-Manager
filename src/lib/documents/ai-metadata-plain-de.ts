@@ -70,6 +70,7 @@ export function formatAiRawJsonAsPlainGerman(raw: Record<string, unknown> | null
     "action_required",
     "action_description",
     "confidence",
+    "image_transcript",
     POSTBOX_JSON_KEY,
     POSTBOX_EXTRACTED_TEXT_JSON_KEY,
   ]);

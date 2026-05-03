@@ -93,15 +93,17 @@ export async function POST(request: Request) {
       }
     }
 
-    const MAX_STORED_EXTRACTED = 64_000;
-    const extractedTextForDb = text.slice(0, MAX_STORED_EXTRACTED);
-
     const analysis = await analyzeWithOpenAI({
       text,
       originalFilename: doc.original_filename,
       mimeType: doc.mime_type,
       imageBase64,
     });
+
+    const MAX_STORED_EXTRACTED = 64_000;
+    const transcript = (analysis.image_transcript ?? "").trim();
+    const combinedExtract = [text.trim(), transcript].filter(Boolean).join("\n\n---\n\n");
+    const extractedTextForDb = combinedExtract.slice(0, MAX_STORED_EXTRACTED);
 
     const category = categoryFromDocumentType(analysis.document_type);
     const displayName = buildDisplayName({
@@ -127,6 +129,7 @@ export async function POST(request: Request) {
     }
 
     const rawPayload = { ...analysis } as Record<string, unknown>;
+    delete rawPayload.image_transcript;
     delete rawPayload[POSTBOX_EXTRACTED_TEXT_JSON_KEY];
 
     const { data: existingMeta } = await supabase
