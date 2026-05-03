@@ -9,11 +9,13 @@ type Props = {
   userEditedAt: string | null | undefined;
   /** Zusätzliche Klassen für den Haupt-Button (z. B. Layout). */
   className?: string;
+  /** Kein Hilfetext unter dem Button (z. B. in einer Button-Zeile; Hinweis steht außen). */
+  compact?: boolean;
 };
 
 const PROGRESS_CAP_LOADING = 97;
 
-export function DocumentReanalyzeButton({ documentId, userEditedAt, className }: Props) {
+export function DocumentReanalyzeButton({ documentId, userEditedAt, className, compact }: Props) {
   const router = useRouter();
   const [phase, setPhase] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -88,13 +90,18 @@ export function DocumentReanalyzeButton({ documentId, userEditedAt, className }:
   const showBar =
     progressPercent != null && (phase === "loading" || phase === "success");
 
+  const hintTitle = userEditedAt
+    ? "Erneute Analyse: KI-Felder werden aktualisiert. Titel und Kategorie bleiben bei manueller Bearbeitung erhalten."
+    : "Analysiert das Dokument erneut mit der aktuellen Logik.";
+
   return (
-    <div className="mt-4 space-y-2">
+    <div className={`flex flex-col gap-2 ${compact ? "" : "mt-4"}`}>
       <button
         type="button"
         onClick={() => void onClick()}
         disabled={busy}
-        className={`inline-flex min-h-[2.75rem] items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 ${className ?? ""}`}
+        title={compact ? hintTitle : undefined}
+        className={`inline-flex h-11 w-full min-w-0 items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-5 ${className ?? ""}`}
       >
         {busy ? (
           <>
@@ -105,15 +112,17 @@ export function DocumentReanalyzeButton({ documentId, userEditedAt, className }:
           "Erneut analysieren"
         )}
       </button>
-      <p className="text-xs text-zinc-500">
-        Analysiert das Dokument erneut mit der aktuellen Logik.
-        {userEditedAt ? (
-          <span className="mt-1 block text-zinc-600">
-            Manuelle Änderungen an Titel oder Kategorie bleiben erhalten; KI-Felder in der Auswertung
-            werden erneuert.
-          </span>
-        ) : null}
-      </p>
+      {!compact ? (
+        <p className="text-xs text-zinc-500">
+          Analysiert das Dokument erneut mit der aktuellen Logik.
+          {userEditedAt ? (
+            <span className="mt-1 block text-zinc-600">
+              Manuelle Änderungen an Titel oder Kategorie bleiben erhalten; KI-Felder in der Auswertung
+              werden erneuert.
+            </span>
+          ) : null}
+        </p>
+      ) : null}
       {showBar ? (
         <div className="w-full">
           <div

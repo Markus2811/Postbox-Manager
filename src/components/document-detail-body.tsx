@@ -174,26 +174,32 @@ export function DocumentDetailBody({
       </header>
 
       <section className={embedded ? "mt-8 space-y-3" : "mt-10 space-y-3"} aria-label="Aktionen">
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
           <a
             href={`/api/documents/${documentId}/download`}
-            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center rounded-xl bg-zinc-900 px-5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:flex-initial"
+            className="inline-flex h-11 w-full shrink-0 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:min-w-0 sm:flex-1 sm:basis-0 sm:px-5"
           >
             Dokument öffnen
           </a>
           <a
             href={`/api/documents/${documentId}/download`}
-            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-center text-sm font-semibold text-zinc-800 shadow-sm hover:border-zinc-300 hover:bg-zinc-50 sm:flex-initial"
+            className="inline-flex h-11 w-full shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm hover:border-zinc-300 hover:bg-zinc-50 sm:min-w-0 sm:flex-1 sm:basis-0 sm:px-5"
           >
             Download
           </a>
-          <DocumentReanalyzeButton
-            documentId={documentId}
-            userEditedAt={userEditedAt}
-            className="flex-1 sm:flex-initial"
-          />
+          <div className="w-full shrink-0 sm:w-auto sm:min-w-[11rem] sm:max-w-[15rem]">
+            <DocumentReanalyzeButton documentId={documentId} userEditedAt={userEditedAt} compact />
+          </div>
         </div>
-        <p className="text-xs text-zinc-400">Öffnen und Download nutzen einen kurz gültigen, sicheren Link.</p>
+        <p className="text-xs leading-relaxed text-zinc-400">
+          Öffnen und Download nutzen einen kurz gültigen, sicheren Link.{" "}
+          <span className="text-zinc-500">
+            Erneut analysieren wendet die aktuelle Auswertelogik erneut an.
+            {userEditedAt
+              ? " Titel und Kategorie bleiben bei manueller Bearbeitung erhalten."
+              : null}
+          </span>
+        </p>
       </section>
 
       <section className="mt-10" aria-labelledby={`key-facts-${documentId}`}>
@@ -359,16 +365,7 @@ export function DocumentDetailBody({
           </Link>
           .
         </p>
-      ) : (
-        <p className="mt-8 text-center text-xs text-zinc-400">
-          <Link
-            href={`/documents/${documentId}`}
-            className="font-medium text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline"
-          >
-            Vollständige Seite öffnen
-          </Link>
-        </p>
-      )}
+      ) : null}
     </>
   );
 
