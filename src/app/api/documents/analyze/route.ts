@@ -2,6 +2,7 @@ import { analyzeWithOpenAI } from "@/lib/ai/analyze-with-openai";
 import { categoryFromDocumentType } from "@/lib/documents/categories";
 import { buildDisplayName } from "@/lib/documents/display-name";
 import { extractDocumentContent } from "@/lib/documents/extract-content";
+import { renderPdfFirstPagePngBase64 } from "@/lib/documents/render-pdf-first-page-png";
 import {
   POSTBOX_EXTRACTED_TEXT_JSON_KEY,
   POSTBOX_JSON_KEY,
@@ -84,19 +85,26 @@ export async function POST(request: Request) {
 
     let text = manual;
     let imageBase64: string | undefined;
+    let visionMimeForOpenAi = doc.mime_type;
 
     if (!text) {
       const extracted = await extractDocumentContent(buffer, doc.mime_type);
       text = extracted.text;
       if (extracted.needsVision && doc.mime_type.startsWith("image/")) {
         imageBase64 = buffer.toString("base64");
+      } else if (extracted.needsVision && doc.mime_type.toLowerCase() === "application/pdf") {
+        const pngB64 = await renderPdfFirstPagePngBase64(buffer);
+        if (pngB64) {
+          imageBase64 = pngB64;
+          visionMimeForOpenAi = "image/png";
+        }
       }
     }
 
     const analysis = await analyzeWithOpenAI({
       text,
       originalFilename: doc.original_filename,
-      mimeType: doc.mime_type,
+      mimeType: visionMimeForOpenAi,
       imageBase64,
     });
 

@@ -15,6 +15,12 @@ export type ExtractResult = {
  * Unter Node (u. a. Vercel Serverless) fehlen die — @napi-rs/canvas stellt sie bereit
  * (gleiches Muster wie `pdf-parse/worker`).
  */
+/** Gleiche pdfjs-Umgebung wie für Text-Extraktion (z. B. erste Seite als PNG). */
+export async function ensurePdfjsEnvironmentForRendering(): Promise<void> {
+  await ensurePdfjsCanvasGlobals();
+  await ensurePdfjsWorkerSrc();
+}
+
 async function ensurePdfjsCanvasGlobals(): Promise<void> {
   const g = globalThis as unknown as Record<string, unknown>;
   if (g.DOMMatrix) return;
