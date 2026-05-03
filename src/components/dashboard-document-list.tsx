@@ -79,20 +79,26 @@ function StatusBadges({
   const done = workspace === "done";
   if (done) {
     return (
-      <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-900 ring-1 ring-emerald-200/80">
+      <span
+        className="inline-flex select-none items-center gap-1.5 text-xs font-medium text-emerald-700"
+        aria-label="Status: Erledigt"
+      >
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
         Erledigt
       </span>
     );
   }
   if (actionRequired) {
     return (
-      <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-200/80">
+      <span className="inline-flex select-none items-center gap-1.5 text-xs font-medium text-amber-800">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
         Handlung nötig
       </span>
     );
   }
   return (
-    <span className="inline-flex rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200/80">
+    <span className="inline-flex select-none items-center gap-1.5 text-xs font-medium text-zinc-500">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-400" aria-hidden />
       Offen
     </span>
   );
@@ -283,7 +289,7 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
                   router.push(`/documents/${doc.id}`);
                 }}
               >
-                <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-start lg:gap-6">
+                <div className="flex flex-col gap-6 p-5 sm:p-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
                   <div className="min-w-0 flex-1">
                     <Link
                       href={`/documents/${doc.id}`}
@@ -301,53 +307,57 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
                     </p>
                   </div>
 
-                  <div className="flex shrink-0 flex-row gap-8 sm:gap-10 lg:flex-col lg:items-end lg:gap-3 lg:text-right">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 lg:text-right">
-                        Betrag
-                      </p>
-                      {amountStr ? (
-                        <p className="mt-0.5 text-lg font-bold tabular-nums text-zinc-900">{amountStr}</p>
-                      ) : (
-                        <p className="mt-0.5 text-sm font-medium text-zinc-400">Kein Betrag</p>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 lg:text-right">
-                        Frist
-                      </p>
-                      <p className={`mt-0.5 text-sm ${dueLabelClass(u)}`}>
-                        {m?.due_date ? formatDate(m.due_date) : "Keine Frist"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex shrink-0 flex-col gap-3 border-t border-zinc-100 pt-4 lg:border-t-0 lg:pt-0">
-                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                      <StatusBadges workspace={doc.workspace_bucket} actionRequired={!!m?.action_required} />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                      <Link
-                        href={`/documents/${doc.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
-                      >
-                        Ansehen
-                      </Link>
-                      <div className="[&_button]:min-h-[2.25rem]">
-                        <DashboardWorkspaceToggle documentId={doc.id} workspace={doc.workspace_bucket} />
+                  <div className="flex shrink-0 flex-col gap-6 lg:items-end">
+                    <div className="flex flex-row justify-between gap-10 sm:gap-14 lg:justify-end lg:gap-10 lg:text-right">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 lg:text-right">
+                          Betrag
+                        </p>
+                        {amountStr ? (
+                          <p className="mt-1 text-lg font-semibold tabular-nums tracking-tight text-zinc-900">
+                            {amountStr}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-sm font-medium text-zinc-400">Kein Betrag</p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 lg:text-right">
+                          Frist
+                        </p>
+                        <p className={`mt-1 text-sm ${dueLabelClass(u)}`}>
+                          {m?.due_date ? formatDate(m.due_date) : "Keine Frist"}
+                        </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedId((id) => (id === doc.id ? null : doc.id));
-                      }}
-                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-sm font-medium text-zinc-800 shadow-sm hover:border-zinc-300 hover:bg-zinc-50 lg:text-right"
-                    >
-                      {expandedId === doc.id ? "Weniger anzeigen" : "Weitere Details"}
-                    </button>
+
+                    <div className="flex flex-col gap-4 border-t border-zinc-100/90 pt-6 lg:border-t-0 lg:pt-0">
+                      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                        <StatusBadges workspace={doc.workspace_bucket} actionRequired={!!m?.action_required} />
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
+                        <Link
+                          href={`/documents/${doc.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex min-h-[2.25rem] items-center justify-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+                        >
+                          Ansehen
+                        </Link>
+                        <DashboardWorkspaceToggle documentId={doc.id} workspace={doc.workspace_bucket} />
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedId((id) => (id === doc.id ? null : doc.id));
+                          }}
+                          className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-4 transition hover:text-zinc-900 hover:decoration-zinc-500"
+                        >
+                          {expandedId === doc.id ? "Weniger anzeigen" : "Weitere Details"}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 {expandedId === doc.id ? <DashboardExpandedAnalysis doc={doc} /> : null}
