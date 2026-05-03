@@ -1,12 +1,16 @@
 "use client";
 
 import { DashboardWorkspaceToggle } from "@/components/dashboard-workspace-toggle";
+import { DocumentReanalyzeButton } from "@/components/document-reanalyze-button";
+import { formatAiRawJsonAsPlainGerman } from "@/lib/documents/ai-metadata-plain-de";
+import { documentTypeUiLabel } from "@/lib/documents/categories";
 import type { DashboardDocumentRow } from "@/lib/documents/dashboard-row";
 import { addDaysToYmd, compareYmd, formatCurrency, formatDate, todayYmd } from "@/lib/documents/format";
 import { humanizeDocumentTitle } from "@/lib/documents/humanize-title";
+import { documentStatusUiLabel } from "@/lib/documents/ui-labels";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 function dueUrgency(due: string | null | undefined): "overdue" | "soon" | "neutral" | "empty" {
   if (!due?.trim()) return "empty";
@@ -94,8 +98,144 @@ function StatusBadges({
   );
 }
 
+function DashboardExpandedAnalysis({ doc }: { doc: DashboardDocumentRow }) {
+  const m = doc.document_metadata;
+  const aiPlain =
+    doc.raw_ai_json && typeof doc.raw_ai_json === "object" && !Array.isArray(doc.raw_ai_json)
+      ? formatAiRawJsonAsPlainGerman(doc.raw_ai_json)
+      : "";
+
+  return (
+    <div className="space-y-6 border-t border-zinc-100 bg-zinc-50/60 px-4 py-5 sm:px-5">
+      {m ? (
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-zinc-800">Auswertung</h3>
+          <dl className="grid gap-4 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-medium text-zinc-500">Dokumentart (KI)</dt>
+              <dd className="mt-1 text-zinc-800">{documentTypeUiLabel(m.document_type)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-zinc-500">Dokumentdatum</dt>
+              <dd className="mt-1 text-zinc-800">{m.document_date ? formatDate(m.document_date) : "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-zinc-500">Ablage</dt>
+              <dd className="mt-1 text-zinc-800">{doc.workspace_bucket === "done" ? "Erledigt" : "Posteingang"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-zinc-500">Kategorie</dt>
+              <dd className="mt-1 text-zinc-800">{doc.category?.trim() || "—"}</dd>
+            </div>
+            {doc.payment_payer?.trim() ? (
+              <div>
+                <dt className="text-xs font-medium text-zinc-500">Zahlung von</dt>
+                <dd className="mt-1 text-zinc-800">{doc.payment_payer}</dd>
+              </div>
+            ) : null}
+            {doc.payment_recipient?.trim() ? (
+              <div>
+                <dt className="text-xs font-medium text-zinc-500">Zahlung an</dt>
+                <dd className="mt-1 text-zinc-800">{doc.payment_recipient}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </div>
+      ) : null}
+
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-800">Dokument</h3>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
+          <a
+            href={`/api/documents/${doc.id}/download`}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
+          >
+            Herunterladen
+          </a>
+          <DocumentReanalyzeButton documentId={doc.id} userEditedAt={doc.user_edited_at} />
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">Download-Link kurz gültig.</p>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-800">Technische Angaben</h3>
+        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs font-medium text-zinc-500">Auswertung</dt>
+            <dd className="mt-1 text-zinc-800">{documentStatusUiLabel(doc.status)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-zinc-500">Originaldatei</dt>
+            <dd className="mt-1 break-all text-zinc-800">{doc.original_filename}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-zinc-500">Hochgeladen</dt>
+            <dd className="mt-1 text-zinc-800">{new Date(doc.created_at).toLocaleString("de-DE")}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-zinc-500">Zuletzt geändert</dt>
+            <dd className="mt-1 text-zinc-800">{new Date(doc.updated_at).toLocaleString("de-DE")}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-zinc-500">Dateityp</dt>
+            <dd className="mt-1 text-zinc-800">{doc.mime_type ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-zinc-500">Größe</dt>
+            <dd className="mt-1 text-zinc-800">
+              {doc.file_size != null ? `${(doc.file_size / 1024).toFixed(1)} KB` : "—"}
+            </dd>
+          </div>
+          {m?.confidence != null && !Number.isNaN(Number(m.confidence)) ? (
+            <div>
+              <dt className="text-xs font-medium text-zinc-500">Zuverlässigkeit (KI)</dt>
+              <dd className="mt-1 text-zinc-800">{Math.round(Number(m.confidence) * 100)} %</dd>
+            </div>
+          ) : null}
+        </dl>
+      </div>
+
+      {doc.completion_note?.trim() ? (
+        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-950 ring-1 ring-emerald-200/80">
+          <p className="text-xs font-medium text-emerald-800">Notiz beim Erledigen</p>
+          <p className="mt-1 whitespace-pre-wrap">{doc.completion_note.trim()}</p>
+        </div>
+      ) : null}
+
+      {m?.action_required ? (
+        <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200/80">
+          <span className="font-semibold">Handlung nötig</span>
+          {m.action_description ? ` — ${m.action_description}` : null}
+        </div>
+      ) : null}
+
+      {m?.summary?.trim() ? (
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-800">Kurzüberblick</h3>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-700">{m.summary.trim()}</p>
+        </div>
+      ) : null}
+
+      {aiPlain ? (
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-800">Auswertung (KI, vollständig)</h3>
+          <p className="mt-2 max-h-[min(28rem,70vh)] overflow-auto whitespace-pre-wrap rounded-xl bg-white p-4 text-sm leading-relaxed text-zinc-700 ring-1 ring-zinc-200/80">
+            {aiPlain}
+          </p>
+        </div>
+      ) : null}
+
+      {!m && !aiPlain ? (
+        <p className="text-sm text-zinc-500">Für dieses Dokument liegt noch keine Auswertung vor.</p>
+      ) : null}
+    </div>
+  );
+}
+
 export function DashboardDocumentList({ documents }: { documents: DashboardDocumentRow[] }) {
   const router = useRouter();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const sums = useMemo(() => sumByCurrency(documents), [documents]);
 
   if (documents.length === 0) {
@@ -198,8 +338,19 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
                         <DashboardWorkspaceToggle documentId={doc.id} workspace={doc.workspace_bucket} />
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedId((id) => (id === doc.id ? null : doc.id));
+                      }}
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-sm font-medium text-zinc-800 shadow-sm hover:border-zinc-300 hover:bg-zinc-50 lg:text-right"
+                    >
+                      {expandedId === doc.id ? "Weniger anzeigen" : "Weitere Details"}
+                    </button>
                   </div>
                 </div>
+                {expandedId === doc.id ? <DashboardExpandedAnalysis doc={doc} /> : null}
               </article>
             </li>
           );
