@@ -114,6 +114,7 @@ function DashboardExpandedDetail({ doc }: { doc: DashboardDocumentRow }) {
   return (
     <DocumentDetailBody
       variant="embedded"
+      suppressTitle
       documentId={doc.id}
       title={humanizeDocumentTitle(doc.display_name, doc.original_filename)}
       sender={m?.sender ?? null}
@@ -202,13 +203,15 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
                     >
                       {title}
                     </Link>
-                    <NotesPreview text={doc.completion_note} />
-                    <p
-                      className={`mt-2 text-sm ${sender ? "text-zinc-500" : "text-zinc-400"}`}
-                      title={sender || undefined}
-                    >
-                      {sender || "Absender unbekannt"}
-                    </p>
+                    {expandedId !== doc.id ? <NotesPreview text={doc.completion_note} /> : null}
+                    {expandedId !== doc.id ? (
+                      <p
+                        className={`mt-2 text-sm ${sender ? "text-zinc-500" : "text-zinc-400"}`}
+                        title={sender || undefined}
+                      >
+                        {sender || "Absender unbekannt"}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="flex shrink-0 flex-col gap-6 lg:items-end">
@@ -236,19 +239,23 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
                     </div>
 
                     <div className="flex flex-col gap-4 border-t border-zinc-100/90 pt-6 lg:border-t-0 lg:pt-0">
-                      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-                        <StatusBadges workspace={doc.workspace_bucket} actionRequired={!!m?.action_required} />
-                      </div>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
-                        <Link
-                          href={`/documents/${doc.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex min-h-[2.25rem] items-center justify-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
-                        >
-                          Ansehen
-                        </Link>
-                        <DashboardWorkspaceToggle documentId={doc.id} workspace={doc.workspace_bucket} />
-                      </div>
+                      {expandedId !== doc.id ? (
+                        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                          <StatusBadges workspace={doc.workspace_bucket} actionRequired={!!m?.action_required} />
+                        </div>
+                      ) : null}
+                      {expandedId !== doc.id ? (
+                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
+                          <Link
+                            href={`/documents/${doc.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex min-h-[2.25rem] items-center justify-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+                          >
+                            Ansehen
+                          </Link>
+                          <DashboardWorkspaceToggle documentId={doc.id} workspace={doc.workspace_bucket} />
+                        </div>
+                      ) : null}
                       <div className="flex justify-end">
                         <button
                           type="button"

@@ -58,7 +58,7 @@ export default async function DocumentDetailPage({
   return (
     <div className="flex min-h-full flex-col bg-zinc-50">
       <AppNav />
-      <main className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
+      <main className="mx-auto w-full max-w-3xl px-4 py-14 sm:px-8 sm:py-20">
         <DocumentDetailBody
           variant="page"
           documentId={doc.id}

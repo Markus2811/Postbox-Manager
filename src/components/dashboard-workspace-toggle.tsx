@@ -5,12 +5,20 @@ import type { DocumentWorkspaceBucket } from "@/lib/documents/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+const mainBtnDefault =
+  "inline-flex min-h-[2.25rem] items-center justify-center whitespace-nowrap rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50";
+
+const mainBtnToolbar =
+  "inline-flex h-11 w-full items-center justify-center whitespace-nowrap rounded-lg border border-zinc-200/90 bg-white px-4 text-sm font-medium text-zinc-800 shadow-sm hover:border-zinc-300 hover:bg-zinc-50/80 disabled:opacity-50 sm:w-auto sm:min-w-[9rem]";
+
 export function DashboardWorkspaceToggle({
   documentId,
   workspace,
+  variant = "default",
 }: {
   documentId: string;
   workspace: DocumentWorkspaceBucket;
+  variant?: "default" | "toolbar";
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -48,14 +56,20 @@ export function DashboardWorkspaceToggle({
     router.refresh();
   }
 
+  const mainBtnClass = variant === "toolbar" ? mainBtnToolbar : mainBtnDefault;
+  const rootClass =
+    variant === "toolbar"
+      ? "flex w-full flex-col items-stretch gap-1 sm:w-auto"
+      : "flex flex-col items-stretch gap-1 sm:items-end";
+
   return (
-    <div className="flex flex-col items-stretch gap-1 sm:items-end">
+    <div className={rootClass}>
       {isDone ? (
         <button
           type="button"
           disabled={busy}
           onClick={() => void setInbox()}
-          className="inline-flex min-h-[2.25rem] items-center justify-center whitespace-nowrap rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
+          className={mainBtnClass}
         >
           {busy ? "…" : "Wieder öffnen"}
         </button>
@@ -69,7 +83,7 @@ export function DashboardWorkspaceToggle({
               setNote("");
               setDialogOpen(true);
             }}
-            className="inline-flex min-h-[2.25rem] items-center justify-center whitespace-nowrap rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50"
+            className={mainBtnClass}
           >
             Erledigen
           </button>
