@@ -2,6 +2,7 @@ import type { DocumentAnalysis } from "@/lib/ai/document-analysis-schema";
 import { analyzeWithOpenAI } from "@/lib/ai/analyze-with-openai";
 import { categoryFromDocumentType } from "@/lib/documents/categories";
 import { buildDisplayName } from "@/lib/documents/display-name";
+import { isMissingDocumentWorkspaceColumns } from "@/lib/documents/document-workspace-fallback";
 import { extractDocumentContent } from "@/lib/documents/extract-content";
 import { renderPdfFirstPagePngBase64 } from "@/lib/documents/render-pdf-first-page-png";
 import {
@@ -52,22 +53,40 @@ export async function runDocumentAnalysis(
 ): Promise<RunDocumentAnalysisResult> {
   const { supabase, userId, documentId, manualText } = options;
 
-  const { data: doc, error: docError } = await supabase
+  const selectFull =
+    "id, user_id, storage_path, original_filename, mime_type, file_size, created_at, user_edited_at";
+  const selectBase =
+    "id, user_id, storage_path, original_filename, mime_type, file_size, created_at";
+
+  let { data: doc, error: docError } = await supabase
     .from("documents")
-    .select(
-      "id, user_id, storage_path, original_filename, mime_type, file_size, created_at, user_edited_at"
-    )
+    .select(selectFull)
     .eq("id", documentId)
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (docError || !doc) {
+  if (docError && isMissingDocumentWorkspaceColumns(docError.message)) {
+    ({ data: doc, error: docError } = await supabase
+      .from("documents")
+      .select(selectBase)
+      .eq("id", documentId)
+      .eq("user_id", userId)
+      .maybeSingle());
+  }
+
+  if (docError) {
+    throw new Error(docError.message || "Dokument konnte nicht geladen werden");
+  }
+  if (!doc) {
     throw new Error("Dokument nicht gefunden");
   }
 
+  const userEditedAt =
+    "user_edited_at" in doc ? (doc as { user_edited_at?: string | null }).user_edited_at : null;
+
   const preserveUserDocumentFields =
     options.preserveUserDocumentFields === undefined
-      ? Boolean(doc.user_edited_at)
+      ? Boolean(userEditedAt)
       : options.preserveUserDocumentFields;
 
   await supabase
