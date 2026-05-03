@@ -376,6 +376,7 @@ async function pipelineOne(
     sender: analysis.sender,
     documentType: analysis.document_type,
     summary: analysis.summary,
+    extractedText: extracted.text,
   });
 
   const tDb0 = performance.now();

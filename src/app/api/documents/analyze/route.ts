@@ -120,6 +120,7 @@ export async function POST(request: Request) {
       sender: analysis.sender,
       documentType: analysis.document_type,
       summary: analysis.summary,
+      extractedText: combinedExtract,
     });
 
     const { error: updateDocError } = await supabase
