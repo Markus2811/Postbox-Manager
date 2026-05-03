@@ -1,8 +1,6 @@
 import { DocumentsExportToolbar } from "@/app/dokumentenliste/documents-export-toolbar";
-import {
-  EditableDocumentsTable,
-  type EditableGridRow,
-} from "@/app/dokumentenliste/editable-documents-table";
+import { DocumentsReadonlyTable } from "@/app/dokumentenliste/documents-readonly-table";
+import type { EditableGridRow } from "@/app/dokumentenliste/editable-documents-table";
 import { AppNav } from "@/components/app-nav";
 import { humanizeDocumentTitle } from "@/lib/documents/humanize-title";
 import { documentStatusUiLabel } from "@/lib/documents/ui-labels";
@@ -54,6 +52,7 @@ function toGridRow(doc: DocumentWithMetadata): EditableGridRow {
     display_title: humanizeDocumentTitle(doc.display_name, doc.original_filename),
     category: doc.category,
     workspace_label: doc.workspace_bucket === "done" ? "Erledigt" : "Offen",
+    workspace_bucket: doc.workspace_bucket,
     status_label: documentStatusUiLabel(doc.status),
     created_at: doc.created_at,
     recipient: hints.recipient || "",
@@ -111,49 +110,38 @@ export default async function DokumentenlistePage({ searchParams }: PageProps) {
   return (
     <div className="flex min-h-full flex-col bg-zinc-50">
       <AppNav />
-      <main className="mx-auto w-full max-w-[90rem] space-y-6 px-4 py-10 sm:px-6">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dokumente</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
-              Tabellenansicht zum <strong className="font-medium text-zinc-800">manuellen Bearbeiten</strong> der
-              KI-Felder (Typ, Daten, Betrag, Texte). Änderungen pro Zeile mit <strong>Speichern</strong> übernehmen.{" "}
-              <strong className="font-medium text-zinc-800">Erledigt / Offen</strong> nur im{" "}
-              <Link href="/dashboard" className="font-medium text-zinc-900 underline-offset-2 hover:underline">
-                Dashboard
-              </Link>
-              . Pro Seite {DOCUMENTS_TABLE_PAGE_SIZE} Zeilen.
-            </p>
-          </div>
+      <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10 sm:px-6">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dokumente</h1>
           <DocumentsExportToolbar />
         </header>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-zinc-500">Thema</span>
+          <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">Filter</span>
           <Link
             href="/dokumentenliste"
-            className={`rounded-xl px-4 py-2 text-sm font-medium ${
-              !thema ? "bg-zinc-900 text-white shadow-sm" : "bg-white text-zinc-700 shadow-sm ring-1 ring-zinc-200/80 hover:bg-zinc-50"
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              !thema ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
             }`}
           >
             Alle
           </Link>
           <Link
             href="/dokumentenliste?thema=finanzen"
-            className={`rounded-xl px-4 py-2 text-sm font-medium ${
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
               thema === "finanzen"
-                ? "bg-zinc-900 text-white shadow-sm"
-                : "bg-white text-zinc-700 shadow-sm ring-1 ring-zinc-200/80 hover:bg-zinc-50"
+                ? "bg-zinc-900 text-white"
+                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
             }`}
           >
             Bank &amp; Finanzen
           </Link>
           <Link
             href="/dokumentenliste?thema=vertraege"
-            className={`rounded-xl px-4 py-2 text-sm font-medium ${
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
               thema === "vertraege"
-                ? "bg-zinc-900 text-white shadow-sm"
-                : "bg-white text-zinc-700 shadow-sm ring-1 ring-zinc-200/80 hover:bg-zinc-50"
+                ? "bg-zinc-900 text-white"
+                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
             }`}
           >
             Verträge
@@ -195,7 +183,7 @@ export default async function DokumentenlistePage({ searchParams }: PageProps) {
             Noch keine Dokumente. Unter <Link href="/upload" className="font-medium text-zinc-900 underline-offset-2 hover:underline">Upload</Link> kannst du Dateien hinzufügen.
           </div>
         ) : (
-          <EditableDocumentsTable rows={gridRows} />
+          <DocumentsReadonlyTable rows={gridRows} />
         )}
 
         {showPageNumbers ? (

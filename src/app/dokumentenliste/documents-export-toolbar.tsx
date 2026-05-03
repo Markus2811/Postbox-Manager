@@ -55,9 +55,7 @@ export function DocumentsExportToolbar() {
       >
         {pending ? "…" : "Excel (CSV DE)"}
       </button>
-      <span className="text-xs text-zinc-500">
-        Export enthält alle Dokumente (nicht nur diese Seite).
-      </span>
+      <span className="hidden text-xs text-zinc-400 sm:inline">Alle Einträge, nicht nur diese Seite.</span>
     </div>
   );
 }
