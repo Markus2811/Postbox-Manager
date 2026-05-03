@@ -15,6 +15,9 @@ export type EditableGridRow = {
   workspace_bucket: DocumentWorkspaceBucket;
   status_label: string;
   created_at: string;
+  user_edited_at: string | null;
+  /** KI-Zuverlässigkeit 0–1 */
+  confidence: number | null;
   recipient: string;
   payer: string;
   meta: {

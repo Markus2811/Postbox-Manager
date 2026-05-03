@@ -150,7 +150,7 @@ export function collectDashboardTasks(docs: DocumentListRowRaw[]): DashboardTask
     items.push({
       documentId: d.id,
       title: docTitle(d),
-      href: `/dashboard?focus=${encodeURIComponent(d.id)}`,
+      href: `/documents/${d.id}`,
       tier,
       daysFromDue: days,
       urgency: urgencyForTier(tier),

@@ -46,6 +46,10 @@ function toGridRow(doc: DocumentWithMetadata): EditableGridRow {
 
   const completion_note = m?.raw_ai_json ? completionNoteFromRawAi(m.raw_ai_json) : null;
 
+  const conf = m?.confidence;
+  const confidence =
+    conf != null && !Number.isNaN(Number(conf)) ? Number(conf) : null;
+
   return {
     id: doc.id,
     original_filename: doc.original_filename,
@@ -55,6 +59,8 @@ function toGridRow(doc: DocumentWithMetadata): EditableGridRow {
     workspace_bucket: doc.workspace_bucket,
     status_label: documentStatusUiLabel(doc.status),
     created_at: doc.created_at,
+    user_edited_at: doc.user_edited_at ?? null,
+    confidence,
     recipient: hints.recipient || "",
     payer: hints.payer || "",
     completion_note: completion_note ?? "",
@@ -112,7 +118,14 @@ export default async function DokumentenlistePage({ searchParams }: PageProps) {
       <AppNav />
       <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10 sm:px-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dokumente</h1>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dokumente</h1>
+            <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+              Tabellarische Detailansicht mit allen verfügbaren Feldern (ohne doppelte Spalten). Export CSV / Excel
+              rechts – gilt für <strong className="font-medium text-zinc-800">alle</strong> Dokumente, nicht nur die
+              aktuelle Seite.
+            </p>
+          </div>
           <DocumentsExportToolbar />
         </header>
 

@@ -13,7 +13,7 @@ export function ViewDocCard({
   const m = doc.document_metadata;
   return (
     <Link
-      href={`/dashboard?focus=${encodeURIComponent(doc.id)}`}
+      href={`/documents/${doc.id}`}
       className="block rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">

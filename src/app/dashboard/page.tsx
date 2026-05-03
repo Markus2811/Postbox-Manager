@@ -81,7 +81,7 @@ function toRows(raw: DocumentListRowRaw[]): DashboardDocumentRow[] {
 }
 
 type PageProps = {
-  searchParams: Promise<{ q?: string; ablage?: string; focus?: string }>;
+  searchParams: Promise<{ q?: string; ablage?: string }>;
 };
 
 export default async function DashboardPage({ searchParams }: PageProps) {
@@ -96,7 +96,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   }
 
   const q = sp.q?.trim() ?? "";
-  const focusDocId = sp.focus?.trim() || null;
   const ablageParam = sp.ablage;
   const activeAblage =
     ablageParam === "done" ? "done" : ablageParam === "inbox" ? "inbox" : "alle";
@@ -125,8 +124,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dashboard</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">
-              Schnellüberblick: Titel, Absender, Betrag, Frist und Notizen. Als erledigt markieren direkt in der
-              Zeile. Ausführliche Felder und Bearbeitung in der{" "}
+              Schnellüberblick: Titel, Absender, Betrag, Frist und Notizen.{" "}
+              <strong className="font-medium text-zinc-800">Ansehen</strong> öffnet die vollständige
+              Dokumentansicht. Alle Felder in Spalten und CSV-/Excel-Export in der{" "}
               <Link href="/dokumentenliste" className="font-medium text-zinc-900 underline-offset-2 hover:underline">
                 Dokumentenliste
               </Link>
@@ -147,7 +147,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
         <DashboardAblageFilter activeAblage={activeAblage} />
 
-        <DashboardDocumentList documents={documents} initialExpandedDocumentId={focusDocId} />
+        <DashboardDocumentList documents={documents} />
       </main>
     </div>
   );
