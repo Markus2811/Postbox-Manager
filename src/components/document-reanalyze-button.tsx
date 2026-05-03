@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
   documentId: string;
@@ -9,14 +9,45 @@ type Props = {
   userEditedAt: string | null | undefined;
 };
 
+const PROGRESS_CAP_LOADING = 97;
+
 export function DocumentReanalyzeButton({ documentId, userEditedAt }: Props) {
   const router = useRouter();
   const [phase, setPhase] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [progressPercent, setProgressPercent] = useState<number | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearProgress = useCallback(() => {
+    if (progressIntervalRef.current != null) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearProgress();
+    };
+  }, [clearProgress]);
+
+  const startProgress = useCallback(() => {
+    clearProgress();
+    setProgressPercent(1);
+    progressIntervalRef.current = setInterval(() => {
+      setProgressPercent((p) => {
+        if (p == null) return null;
+        if (p >= PROGRESS_CAP_LOADING) return p;
+        const step = p < 50 ? 2 : 1;
+        return Math.min(PROGRESS_CAP_LOADING, p + step);
+      });
+    }, 160);
+  }, [clearProgress]);
 
   const onClick = useCallback(async () => {
     setPhase("loading");
     setMessage(null);
+    startProgress();
     try {
       const res = await fetch(`/api/documents/${documentId}/reanalyze`, {
         method: "POST",
@@ -28,11 +59,14 @@ export function DocumentReanalyzeButton({ documentId, userEditedAt }: Props) {
         error?: string;
         preservedDisplayAndCategory?: boolean;
       };
+      clearProgress();
       if (!res.ok) {
+        setProgressPercent(null);
         setPhase("error");
         setMessage(data.error ?? "Analyse fehlgeschlagen.");
         return;
       }
+      setProgressPercent(100);
       setPhase("success");
       setMessage(
         data.preservedDisplayAndCategory
@@ -41,12 +75,16 @@ export function DocumentReanalyzeButton({ documentId, userEditedAt }: Props) {
       );
       router.refresh();
     } catch {
+      clearProgress();
+      setProgressPercent(null);
       setPhase("error");
       setMessage("Netzwerkfehler oder Server nicht erreichbar.");
     }
-  }, [documentId, router]);
+  }, [clearProgress, documentId, router, startProgress]);
 
   const busy = phase === "loading";
+  const showBar =
+    progressPercent != null && (phase === "loading" || phase === "success");
 
   return (
     <div className="mt-4 space-y-2">
@@ -56,7 +94,14 @@ export function DocumentReanalyzeButton({ documentId, userEditedAt }: Props) {
         disabled={busy}
         className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {busy ? "Analyse läuft…" : "Erneut analysieren"}
+        {busy ? (
+          <>
+            Analyse läuft…
+            {progressPercent != null ? ` ${progressPercent}%` : ""}
+          </>
+        ) : (
+          "Erneut analysieren"
+        )}
       </button>
       <p className="text-xs text-zinc-500">
         Analysiert das Dokument erneut mit der aktuellen Logik.
@@ -67,6 +112,23 @@ export function DocumentReanalyzeButton({ documentId, userEditedAt }: Props) {
           </span>
         ) : null}
       </p>
+      {showBar ? (
+        <div className="w-full">
+          <div
+            className="h-2 w-full overflow-hidden rounded-full bg-zinc-100"
+            role="progressbar"
+            aria-valuenow={progressPercent ?? 0}
+            aria-valuemin={1}
+            aria-valuemax={100}
+            aria-label="Fortschritt erneute Analyse"
+          >
+            <div
+              className="h-full rounded-full bg-zinc-900 transition-[width] duration-200 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
       {phase === "success" && message ? (
         <p className="text-sm font-medium text-emerald-800" role="status">
           {message}
