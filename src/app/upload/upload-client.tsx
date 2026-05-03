@@ -4,7 +4,7 @@ import { sha256HexOfFile } from "@/lib/documents/file-hash";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const ALLOWED = new Set(["application/pdf", "image/jpeg", "image/png"]);
 const MAX_BYTES = 45 * 1024 * 1024;
@@ -27,8 +27,11 @@ function mimeFor(file: File, ext: "pdf" | "jpg" | "png"): string {
 
 type Zeile = {
   id: string;
+  /** Stabil pro Upload-Zeile (für Timer), bleibt erhalten wenn `id` → documentId wechselt */
+  timerKey?: string;
   name: string;
   phase: "wartet" | "lädt" | "analysiert" | "fertig" | "fehler";
+  progressPercent?: number;
   nachricht?: string;
   duplicateOfId?: string;
   duplicateLabel?: string;
@@ -71,9 +74,46 @@ export function UploadClient() {
   const [zeilen, setZeilen] = useState<Zeile[]>([]);
   const [drag, setDrag] = useState(false);
   const [zusatzText, setZusatzText] = useState("");
+  const progressTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  const progressCapRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    return () => {
+      progressTimersRef.current.forEach((t) => clearInterval(t));
+      progressTimersRef.current.clear();
+      progressCapRef.current.clear();
+    };
+  }, []);
 
   const verarbeiteDateien = useCallback(
     async (files: FileList | File[]) => {
+      const clearRowProgress = (timerKey: string) => {
+        const t = progressTimersRef.current.get(timerKey);
+        if (t) {
+          clearInterval(t);
+          progressTimersRef.current.delete(timerKey);
+        }
+        progressCapRef.current.delete(timerKey);
+      };
+
+      const startRowProgress = (timerKey: string) => {
+        clearRowProgress(timerKey);
+        progressCapRef.current.set(timerKey, 38);
+        const id = setInterval(() => {
+          const cap = progressCapRef.current.get(timerKey) ?? 97;
+          setZeilen((z) =>
+            z.map((row) => {
+              if (row.timerKey !== timerKey) return row;
+              const p = row.progressPercent ?? 1;
+              if (p >= cap) return row;
+              const step = p < 50 ? 2 : 1;
+              return { ...row, progressPercent: Math.min(cap, p + step) };
+            })
+          );
+        }, 160);
+        progressTimersRef.current.set(timerKey, id);
+      };
+
       const liste = Array.from(files);
       for (const file of liste) {
         const ext = extensionFor(file);
@@ -116,16 +156,33 @@ export function UploadClient() {
         }
 
         const rowId = crypto.randomUUID();
-        setZeilen((z) => [...z, { id: rowId, name: file.name, phase: "lädt" }]);
+        const timerKey = rowId;
+        setZeilen((z) => [
+          ...z,
+          {
+            id: rowId,
+            timerKey,
+            name: file.name,
+            phase: "lädt",
+            progressPercent: 1,
+          },
+        ]);
+        startRowProgress(timerKey);
 
         let contentHash: string;
         try {
           contentHash = await sha256HexOfFile(file);
         } catch {
+          clearRowProgress(timerKey);
           setZeilen((z) =>
             z.map((row) =>
               row.id === rowId
-                ? { ...row, phase: "fehler", nachricht: "Prüfsumme der Datei konnte nicht berechnet werden." }
+                ? {
+                    ...row,
+                    phase: "fehler",
+                    progressPercent: undefined,
+                    nachricht: "Prüfsumme der Datei konnte nicht berechnet werden.",
+                  }
                 : row
             )
           );
@@ -141,9 +198,12 @@ export function UploadClient() {
         });
 
         if (!initRes.ok) {
+          clearRowProgress(timerKey);
           setZeilen((z) =>
             z.map((row) =>
-              row.id === rowId ? { ...row, phase: "fehler", nachricht: initRes.error } : row
+              row.id === rowId
+                ? { ...row, phase: "fehler", progressPercent: undefined, nachricht: initRes.error }
+                : row
             )
           );
           continue;
@@ -151,12 +211,14 @@ export function UploadClient() {
 
         const init = initRes.data;
         if (init.duplicate === true) {
+          clearRowProgress(timerKey);
           setZeilen((z) =>
             z.map((row) =>
               row.id === rowId
                 ? {
                     ...row,
                     phase: "fehler",
+                    progressPercent: undefined,
                     nachricht:
                       "Duplikat: Diese Datei (identischer Inhalt, SHA-256) liegt bereits vor – auch bei anderem Dateinamen.",
                     duplicateOfId: init.existingId,
@@ -171,7 +233,9 @@ export function UploadClient() {
         const ready = init as UploadInitReady;
         const docId = ready.documentId;
         setZeilen((z) =>
-          z.map((row) => (row.id === rowId ? { ...row, id: docId, phase: "lädt" } : row))
+          z.map((row) =>
+            row.id === rowId ? { ...row, id: docId, phase: "lädt", timerKey } : row
+          )
         );
 
         const supabase = createClient();
@@ -185,12 +249,14 @@ export function UploadClient() {
 
         if (upErr) {
           await postJson("/api/documents/upload-abort", { documentId: docId });
+          clearRowProgress(timerKey);
           setZeilen((z) =>
             z.map((row) =>
               row.id === docId
                 ? {
                     ...row,
                     phase: "fehler",
+                    progressPercent: undefined,
                     nachricht: upErr.message || "Upload zum Speicher fehlgeschlagen.",
                   }
                 : row
@@ -199,8 +265,17 @@ export function UploadClient() {
           continue;
         }
 
+        progressCapRef.current.set(timerKey, 97);
         setZeilen((z) =>
-          z.map((row) => (row.id === docId ? { ...row, phase: "analysiert" } : row))
+          z.map((row) =>
+            row.id === docId
+              ? {
+                  ...row,
+                  phase: "analysiert",
+                  progressPercent: Math.max(row.progressPercent ?? 1, 42),
+                }
+              : row
+          )
         );
 
         const manual = zusatzText.trim();
@@ -219,12 +294,14 @@ export function UploadClient() {
         };
 
         if (!res.ok) {
+          clearRowProgress(timerKey);
           setZeilen((z) =>
             z.map((row) =>
               row.id === docId
                 ? {
                     ...row,
                     phase: "fehler",
+                    progressPercent: undefined,
                     nachricht: analyzeBody.error ?? "Analyse fehlgeschlagen",
                   }
                 : row
@@ -233,8 +310,11 @@ export function UploadClient() {
           continue;
         }
 
+        clearRowProgress(timerKey);
         setZeilen((z) =>
-          z.map((row) => (row.id === docId ? { ...row, phase: "fertig" } : row))
+          z.map((row) =>
+            row.id === docId ? { ...row, phase: "fertig", progressPercent: 100 } : row
+          )
         );
       }
 
@@ -316,37 +396,72 @@ export function UploadClient() {
         <ul className="space-y-2 rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm">
           {zeilen.map((z) => (
             <li
-              key={z.id}
-              className="flex flex-col gap-1 border-b border-zinc-100 py-2 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+              key={z.timerKey ?? z.id}
+              className="flex flex-col gap-2 border-b border-zinc-100 py-2 last:border-0"
             >
-              <span className="truncate font-medium text-zinc-800">{z.name}</span>
-              <span className="text-xs text-zinc-500">
-                {z.phase === "wartet" && "Wartet …"}
-                {z.phase === "lädt" && "Wird hochgeladen …"}
-                {z.phase === "analysiert" && "KI-Analyse …"}
-                {z.phase === "fertig" && "Fertig"}
-                {z.phase === "fehler" && (
-                  <span className="text-red-600">
-                    {z.nachricht ?? "Fehler"}
-                    {z.duplicateOfId ? (
-                      <>
-                        {" "}
-                        <Link
-                          href={`/documents/${z.duplicateOfId}`}
-                          className="font-medium text-zinc-900 underline-offset-2 hover:underline"
-                        >
-                          Zum bestehenden Eintrag
-                        </Link>
-                        {z.duplicateLabel ? (
-                          <span className="block text-zinc-600">
-                            ({z.duplicateLabel})
-                          </span>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </span>
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <span className="truncate font-medium text-zinc-800">{z.name}</span>
+                <span className="shrink-0 text-xs text-zinc-500">
+                  {z.phase === "wartet" && "Wartet …"}
+                  {z.phase === "lädt" && (
+                    <>
+                      Wird hochgeladen …
+                      {z.progressPercent != null ? ` ${z.progressPercent}%` : ""}
+                    </>
+                  )}
+                  {z.phase === "analysiert" && (
+                    <>
+                      KI-Analyse …
+                      {z.progressPercent != null ? ` ${z.progressPercent}%` : ""}
+                    </>
+                  )}
+                  {z.phase === "fertig" && (
+                    <>
+                      Fertig
+                      {z.progressPercent != null ? ` ${z.progressPercent}%` : ""}
+                    </>
+                  )}
+                  {z.phase === "fehler" && (
+                    <span className="text-red-600">
+                      {z.nachricht ?? "Fehler"}
+                      {z.duplicateOfId ? (
+                        <>
+                          {" "}
+                          <Link
+                            href={`/documents/${z.duplicateOfId}`}
+                            className="font-medium text-zinc-900 underline-offset-2 hover:underline"
+                          >
+                            Zum bestehenden Eintrag
+                          </Link>
+                          {z.duplicateLabel ? (
+                            <span className="block text-zinc-600">
+                              ({z.duplicateLabel})
+                            </span>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </span>
+                  )}
+                </span>
+              </div>
+              {(z.phase === "lädt" || z.phase === "analysiert" || z.phase === "fertig") &&
+                z.progressPercent != null && (
+                  <div className="w-full">
+                    <div
+                      className="h-2 w-full overflow-hidden rounded-full bg-zinc-100"
+                      role="progressbar"
+                      aria-valuenow={z.progressPercent}
+                      aria-valuemin={1}
+                      aria-valuemax={100}
+                      aria-label="Fortschritt Upload und Analyse"
+                    >
+                      <div
+                        className="h-full rounded-full bg-zinc-900 transition-[width] duration-200 ease-out"
+                        style={{ width: `${z.progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
-              </span>
             </li>
           ))}
         </ul>
