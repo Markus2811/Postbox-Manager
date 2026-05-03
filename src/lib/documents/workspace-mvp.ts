@@ -3,6 +3,12 @@ import type { DocumentWorkspaceBucket } from "@/lib/documents/types";
 /** Reservierter Schlüssel in `document_metadata.raw_ai_json` (MVP ohne Spalte `workspace_bucket`). */
 export const POSTBOX_JSON_KEY = "_postbox";
 
+/**
+ * Fallback, wenn `document_metadata.extracted_text` (Spalte) in der DB fehlt:
+ * maschinenlesbarer Volltext für Fragen/UI; nicht im KI-Analyse-Schema.
+ */
+export const POSTBOX_EXTRACTED_TEXT_JSON_KEY = "_postbox_extracted_text";
+
 export function workspaceFromMvpMeta(rawAi: unknown): DocumentWorkspaceBucket {
   if (!rawAi || typeof rawAi !== "object" || Array.isArray(rawAi)) return "inbox";
   const box = (rawAi as Record<string, unknown>)[POSTBOX_JSON_KEY];

@@ -1,6 +1,6 @@
 import { documentTypeUiLabel } from "@/lib/documents/categories";
 import { formatCurrency, formatDate } from "@/lib/documents/format";
-import { POSTBOX_JSON_KEY } from "@/lib/documents/workspace-mvp";
+import { POSTBOX_EXTRACTED_TEXT_JSON_KEY, POSTBOX_JSON_KEY } from "@/lib/documents/workspace-mvp";
 
 /**
  * Stellt typische KI-Rohfelder aus `raw_ai_json` als Klartext (Deutsch) dar —
@@ -71,6 +71,7 @@ export function formatAiRawJsonAsPlainGerman(raw: Record<string, unknown> | null
     "action_description",
     "confidence",
     POSTBOX_JSON_KEY,
+    POSTBOX_EXTRACTED_TEXT_JSON_KEY,
   ]);
 
   const extras: string[] = [];

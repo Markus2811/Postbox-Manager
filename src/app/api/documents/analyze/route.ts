@@ -2,7 +2,10 @@ import { analyzeWithOpenAI } from "@/lib/ai/analyze-with-openai";
 import { categoryFromDocumentType } from "@/lib/documents/categories";
 import { buildDisplayName } from "@/lib/documents/display-name";
 import { extractDocumentContent } from "@/lib/documents/extract-content";
-import { POSTBOX_JSON_KEY } from "@/lib/documents/workspace-mvp";
+import {
+  POSTBOX_EXTRACTED_TEXT_JSON_KEY,
+  POSTBOX_JSON_KEY,
+} from "@/lib/documents/workspace-mvp";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -124,6 +127,7 @@ export async function POST(request: Request) {
     }
 
     const rawPayload = { ...analysis } as Record<string, unknown>;
+    delete rawPayload[POSTBOX_EXTRACTED_TEXT_JSON_KEY];
 
     const { data: existingMeta } = await supabase
       .from("document_metadata")
@@ -166,6 +170,9 @@ export async function POST(request: Request) {
     ).error;
 
     if (metaError && isMissingExtractedTextColumn(metaError.message ?? "")) {
+      if (extractedTextForDb.length > 0) {
+        rawPayload[POSTBOX_EXTRACTED_TEXT_JSON_KEY] = extractedTextForDb;
+      }
       metaError = (await supabase.from("document_metadata").upsert(metaBase, { onConflict: "document_id" })).error;
     }
 

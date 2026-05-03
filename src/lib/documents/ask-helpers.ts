@@ -1,5 +1,8 @@
 import { addDaysToYmd, calendarWeekRangeMonSun, compareYmd, todayYmd } from "@/lib/documents/format";
-import { completionNoteFromRawAi } from "@/lib/documents/workspace-mvp";
+import {
+  completionNoteFromRawAi,
+  POSTBOX_EXTRACTED_TEXT_JSON_KEY,
+} from "@/lib/documents/workspace-mvp";
 
 /** Max. Zeichen Volltext pro Dokument im Fragen-Kontext. */
 export const ASK_CONTEXT_EXTRACT_PER_DOC = 20_000;
@@ -73,6 +76,16 @@ function metaOf(r: AskDocRow) {
   return Array.isArray(m) ? m[0] ?? null : m;
 }
 
+/** Spalte `extracted_text` oder JSON-Fallback (ohne DB-Migration). */
+function storedExtractedText(m: AskMeta | null): string | null {
+  const col = m?.extracted_text?.trim();
+  if (col) return col;
+  const raw = m?.raw_ai_json;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const v = (raw as Record<string, unknown>)[POSTBOX_EXTRACTED_TEXT_JSON_KEY];
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
 export function filterAskRows(rows: AskDocRow[], flags: AskFilterFlags): AskDocRow[] {
   let out = rows;
   if (flags.lastHalfYear) {
@@ -120,7 +133,7 @@ export function formatAskContextBlock(
     parts.push(`Notiz (beim Erledigen): ${note}`);
   }
 
-  const full = m?.extracted_text?.trim();
+  const full = storedExtractedText(m);
   let extractBlock: string;
   if (!full) {
     extractBlock =
