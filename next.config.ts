@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
     ],
+    "/app/api/documents/[id]/reanalyze": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+    ],
   },
   /**
    * Ohne diese Einträge blockiert `next dev` Anfragen von anderen Hostnamen (DNS-Rebind-Schutz).

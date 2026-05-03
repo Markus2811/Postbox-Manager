@@ -1,4 +1,5 @@
 import { AppNav } from "@/components/app-nav";
+import { DocumentReanalyzeButton } from "@/components/document-reanalyze-button";
 import { formatAiRawJsonAsPlainGerman } from "@/lib/documents/ai-metadata-plain-de";
 import { fetchDocumentDetailForUser } from "@/lib/documents/document-detail-fetch";
 import { formatCurrency, formatDate } from "@/lib/documents/format";
@@ -137,13 +138,16 @@ export default async function DocumentDetailPage({
             Dokument
           </h2>
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/80">
-            <a
-              href={`/api/documents/${doc.id}/download`}
-              className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
-            >
-              Herunterladen
-            </a>
+            <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-start">
+              <a
+                href={`/api/documents/${doc.id}/download`}
+                className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
+              >
+                Herunterladen
+              </a>
+            </div>
             <p className="mt-3 text-xs text-zinc-500">Sicherer Link, kurz gültig.</p>
+            <DocumentReanalyzeButton documentId={doc.id} userEditedAt={doc.user_edited_at} />
           </div>
         </section>
 

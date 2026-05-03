@@ -5,22 +5,26 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-type AnalyzeBody = {
-  documentId?: string;
+type ReanalyzeBody = {
   manualText?: string;
 };
 
-export async function POST(request: Request) {
-  let body: AnalyzeBody;
-  try {
-    body = (await request.json()) as AnalyzeBody;
-  } catch {
-    return NextResponse.json({ error: "Ungültiger JSON-Body" }, { status: 400 });
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id: documentId } = await context.params;
+  const id = documentId?.trim();
+  if (!id) {
+    return NextResponse.json({ error: "Dokument-ID fehlt" }, { status: 400 });
   }
 
-  const documentId = body.documentId?.trim();
-  if (!documentId) {
-    return NextResponse.json({ error: "documentId fehlt" }, { status: 400 });
+  let body: ReanalyzeBody = {};
+  try {
+    const raw = await request.json().catch(() => ({}));
+    body = typeof raw === "object" && raw !== null ? (raw as ReanalyzeBody) : {};
+  } catch {
+    body = {};
   }
 
   const supabase = await createClient();
@@ -36,9 +40,8 @@ export async function POST(request: Request) {
     const result = await runDocumentAnalysis({
       supabase,
       userId: user.id,
-      documentId,
+      documentId: id,
       manualText: body.manualText,
-      preserveUserDocumentFields: false,
     });
 
     return NextResponse.json({
@@ -46,9 +49,11 @@ export async function POST(request: Request) {
       displayName: result.displayName,
       category: result.category,
       analysis: result.analysis,
+      preservedDisplayAndCategory: result.preservedDisplayAndCategory,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Analyse fehlgeschlagen";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = message === "Dokument nicht gefunden" ? 404 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
