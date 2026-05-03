@@ -69,11 +69,123 @@ async function postJson<T>(url: string, body: unknown): Promise<{ ok: true; data
   return { ok: true, data: data as T };
 }
 
+function IconUploadCloud({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function AnalysisStepRow({
+  label,
+  done,
+}: {
+  label: string;
+  done: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 text-sm">
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+          done ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-400"
+        }`}
+        aria-hidden
+      >
+        {done ? "✓" : "…"}
+      </span>
+      <span className={done ? "font-medium text-zinc-800" : "text-zinc-500"}>{label}</span>
+    </div>
+  );
+}
+
+function UploadProgressCard({ z }: { z: Zeile }) {
+  const p = z.progressPercent ?? 0;
+  const showAnalysisSteps = z.phase === "analysiert" || z.phase === "fertig";
+  const allStepsDone = z.phase === "fertig";
+
+  return (
+    <li
+      key={z.timerKey ?? z.id}
+      className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-sm ring-1 ring-black/[0.03]"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <p className="min-w-0 truncate font-medium text-zinc-900" title={z.name}>
+          {z.name}
+        </p>
+        {z.phase === "fehler" ? (
+          <span className="shrink-0 text-sm text-red-600">
+            {z.nachricht ?? "Etwas ist schiefgelaufen."}
+            {z.duplicateOfId ? (
+              <>
+                {" "}
+                <Link
+                  href={`/documents/${z.duplicateOfId}`}
+                  className="font-medium text-zinc-900 underline-offset-2 hover:underline"
+                >
+                  Zum vorhandenen Dokument
+                </Link>
+                {z.duplicateLabel ? (
+                  <span className="mt-1 block text-xs text-zinc-600">({z.duplicateLabel})</span>
+                ) : null}
+              </>
+            ) : null}
+          </span>
+        ) : z.phase === "fertig" ? (
+          <span className="shrink-0 text-sm font-medium text-emerald-700">Fertig</span>
+        ) : (
+          <span className="shrink-0 text-sm text-zinc-600">
+            {z.phase === "lädt" ? "Wird hochgeladen …" : "Dokument wird analysiert …"}
+          </span>
+        )}
+      </div>
+
+      {z.phase !== "fehler" && (z.phase === "lädt" || z.phase === "analysiert" || z.phase === "fertig") && z.progressPercent != null ? (
+        <div className="mt-4 space-y-4">
+          <div
+            className="h-2 w-full overflow-hidden rounded-full bg-zinc-100"
+            role="progressbar"
+            aria-valuenow={z.progressPercent}
+            aria-valuemin={1}
+            aria-valuemax={100}
+            aria-label="Fortschritt"
+          >
+            <div
+              className="h-full rounded-full bg-zinc-900 transition-[width] duration-200 ease-out"
+              style={{ width: `${z.progressPercent}%` }}
+            />
+          </div>
+
+          {showAnalysisSteps ? (
+            <div className="rounded-xl bg-zinc-50/90 px-4 py-3 ring-1 ring-zinc-100">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                {allStepsDone ? "Auswertung abgeschlossen" : "Auswertung läuft"}
+              </p>
+              <div className="mt-3 space-y-2">
+                <AnalysisStepRow label="Absender erkannt" done={allStepsDone || p >= 48} />
+                <AnalysisStepRow label="Betrag erkannt" done={allStepsDone || p >= 65} />
+                <AnalysisStepRow label="Frist erkannt" done={allStepsDone || p >= 82} />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
 export function UploadClient() {
   const router = useRouter();
   const [zeilen, setZeilen] = useState<Zeile[]>([]);
   const [drag, setDrag] = useState(false);
   const [zusatzText, setZusatzText] = useState("");
+  const [zusatzOpen, setZusatzOpen] = useState(false);
   const progressTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const progressCapRef = useRef<Map<string, number>>(new Map());
 
@@ -124,7 +236,7 @@ export function UploadClient() {
               id: crypto.randomUUID(),
               name: file.name,
               phase: "fehler",
-              nachricht: "Nur PDF, JPG oder PNG.",
+              nachricht: "Bitte nur PDF, JPG oder PNG verwenden.",
             },
           ]);
           continue;
@@ -137,7 +249,7 @@ export function UploadClient() {
               id: crypto.randomUUID(),
               name: file.name,
               phase: "fehler",
-              nachricht: "Dateityp nicht erlaubt.",
+              nachricht: "Dieser Dateityp wird nicht unterstützt.",
             },
           ]);
           continue;
@@ -149,7 +261,7 @@ export function UploadClient() {
               id: crypto.randomUUID(),
               name: file.name,
               phase: "fehler",
-              nachricht: "Datei zu groß (max. 45 MB).",
+              nachricht: "Die Datei ist zu groß (max. 45 MB).",
             },
           ]);
           continue;
@@ -181,7 +293,7 @@ export function UploadClient() {
                     ...row,
                     phase: "fehler",
                     progressPercent: undefined,
-                    nachricht: "Prüfsumme der Datei konnte nicht berechnet werden.",
+                    nachricht: "Die Datei konnte nicht gelesen werden.",
                   }
                 : row
             )
@@ -220,7 +332,7 @@ export function UploadClient() {
                     phase: "fehler",
                     progressPercent: undefined,
                     nachricht:
-                      "Duplikat: Diese Datei (identischer Inhalt, SHA-256) liegt bereits vor – auch bei anderem Dateinamen.",
+                      "Diese Datei liegt bereits in deiner Postbox (gleicher Inhalt) – auch bei anderem Dateinamen.",
                     duplicateOfId: init.existingId,
                     duplicateLabel: init.existingLabel,
                   }
@@ -233,9 +345,7 @@ export function UploadClient() {
         const ready = init as UploadInitReady;
         const docId = ready.documentId;
         setZeilen((z) =>
-          z.map((row) =>
-            row.id === rowId ? { ...row, id: docId, phase: "lädt", timerKey } : row
-          )
+          z.map((row) => (row.id === rowId ? { ...row, id: docId, phase: "lädt", timerKey } : row))
         );
 
         const supabase = createClient();
@@ -257,7 +367,7 @@ export function UploadClient() {
                     ...row,
                     phase: "fehler",
                     progressPercent: undefined,
-                    nachricht: upErr.message || "Upload zum Speicher fehlgeschlagen.",
+                    nachricht: "Upload ist fehlgeschlagen. Bitte erneut versuchen.",
                   }
                 : row
             )
@@ -302,7 +412,7 @@ export function UploadClient() {
                     ...row,
                     phase: "fehler",
                     progressPercent: undefined,
-                    nachricht: analyzeBody.error ?? "Analyse fehlgeschlagen",
+                    nachricht: analyzeBody.error ?? "Die Auswertung ist fehlgeschlagen.",
                   }
                 : row
             )
@@ -312,9 +422,7 @@ export function UploadClient() {
 
         clearRowProgress(timerKey);
         setZeilen((z) =>
-          z.map((row) =>
-            row.id === docId ? { ...row, phase: "fertig", progressPercent: 100 } : row
-          )
+          z.map((row) => (row.id === docId ? { ...row, phase: "fertig", progressPercent: 100 } : row))
         );
       }
 
@@ -324,154 +432,139 @@ export function UploadClient() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 px-4 py-10 sm:px-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          Dokument hochladen
+    <main className="mx-auto flex w-full max-w-lg flex-col px-4 py-12 sm:px-6 sm:py-16">
+      <header className="text-center">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-[1.65rem]">
+          Dokument hochladen &amp; automatisch analysieren
         </h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          PDF, JPEG oder PNG – Metadaten und Speicherpfad legt der Server an; die Datei wird direkt
-          zu Supabase Storage übertragen. Danach startet die KI-Analyse. Gleiche Datei (Inhalt)
-          erkennen wir auch bei anderem Dateinamen.
+        <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-zinc-600">
+          Wir lesen dein Dokument automatisch aus und fassen das Wichtigste zusammen –{" "}
+          <span className="font-medium text-zinc-800">ohne manuelle Arbeit</span>.
         </p>
-      </div>
-
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-        <label htmlFor="zusatz" className="text-sm font-medium text-zinc-700">
-          Optional: zusätzlicher Text für alle Uploads in dieser Sitzung (OCR / Notizen)
-        </label>
-        <textarea
-          id="zusatz"
-          value={zusatzText}
-          onChange={(e) => setZusatzText(e.target.value)}
-          rows={3}
-          placeholder="Leer lassen, wenn die Datei ausreicht …"
-          className="mt-2 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none ring-zinc-900 focus:ring-2"
-        />
-      </div>
-
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDrag(true);
-        }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          if (e.dataTransfer.files?.length) {
-            void verarbeiteDateien(e.dataTransfer.files);
-          }
-        }}
-        className={`rounded-2xl border-2 border-dashed px-6 py-14 text-center transition ${
-          drag
-            ? "border-zinc-900 bg-zinc-50"
-            : "border-zinc-200 bg-white hover:border-zinc-300"
-        }`}
-      >
-        <p className="text-sm font-medium text-zinc-900">
-          Dateien hierher ziehen
+        <ul className="mx-auto mt-5 max-w-sm space-y-2 text-left text-sm text-zinc-700">
+          <li className="flex gap-2">
+            <span className="text-emerald-600" aria-hidden>
+              •
+            </span>
+            <span>Absender</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-emerald-600" aria-hidden>
+              •
+            </span>
+            <span>Betrag</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-emerald-600" aria-hidden>
+              •
+            </span>
+            <span>Fristen</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-emerald-600" aria-hidden>
+              •
+            </span>
+            <span>Wichtige Infos auf einen Blick</span>
+          </li>
+        </ul>
+        <p className="mx-auto mt-6 max-w-md text-xs leading-relaxed text-zinc-500">
+          PDF, JPG oder PNG · gleiche Datei erkennen wir auch bei anderem Namen
         </p>
-        <p className="mt-1 text-xs text-zinc-500">oder</p>
-        <label className="mt-4 inline-block cursor-pointer">
-          <span className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
-            Datei wählen
-          </span>
-          <input
-            type="file"
-            accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-            className="sr-only"
-            multiple
-            onChange={(e) => {
-              if (e.target.files?.length) {
-                void verarbeiteDateien(e.target.files);
-                e.target.value = "";
-              }
-            }}
+      </header>
+
+      <div className="mt-12">
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDrag(true);
+          }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDrag(false);
+            if (e.dataTransfer.files?.length) {
+              void verarbeiteDateien(e.dataTransfer.files);
+            }
+          }}
+          className={`group flex cursor-default flex-col items-center justify-center rounded-2xl border-2 border-dashed px-8 py-16 text-center transition ${
+            drag
+              ? "border-zinc-900 bg-zinc-100/80 shadow-inner"
+              : "border-zinc-200 bg-white shadow-sm ring-1 ring-zinc-100/80 hover:border-zinc-400 hover:bg-zinc-50/50 hover:shadow-md"
+          }`}
+        >
+          <IconUploadCloud
+            className={`mb-5 transition-colors ${drag ? "text-zinc-900" : "text-zinc-400 group-hover:text-zinc-600"}`}
           />
-        </label>
+          <p className="text-base font-semibold text-zinc-900">Dokument hier ablegen</p>
+          <p className="mt-2 text-sm text-zinc-500">oder</p>
+          <label className="mt-6 cursor-pointer">
+            <span className="inline-flex min-h-[2.75rem] items-center justify-center rounded-xl bg-zinc-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800">
+              Datei auswählen
+            </span>
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+              className="sr-only"
+              multiple
+              onChange={(e) => {
+                if (e.target.files?.length) {
+                  void verarbeiteDateien(e.target.files);
+                  e.target.value = "";
+                }
+              }}
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="mt-10">
+        <button
+          type="button"
+          onClick={() => setZusatzOpen((o) => !o)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200/90 bg-white py-3 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50"
+          aria-expanded={zusatzOpen}
+        >
+          <span className="text-zinc-500" aria-hidden>
+            {zusatzOpen ? "−" : "+"}
+          </span>
+          Zusatzinfos hinzufügen (optional)
+        </button>
+        {zusatzOpen ? (
+          <div className="mt-3 rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm ring-1 ring-black/[0.03]">
+            <label htmlFor="zusatz" className="text-sm font-medium text-zinc-800">
+              Freitext für diese Uploads
+            </label>
+            <p className="mt-1 text-xs text-zinc-500">
+              Nur nötig, wenn du der Auswertung noch Kontext geben möchtest. Leer lassen, wenn die Datei
+              reicht.
+            </p>
+            <textarea
+              id="zusatz"
+              value={zusatzText}
+              onChange={(e) => setZusatzText(e.target.value)}
+              rows={3}
+              placeholder="z. B. kurze Notiz zum Vorgang …"
+              className="mt-3 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none ring-zinc-900 focus:ring-2"
+            />
+          </div>
+        ) : null}
       </div>
 
       {zeilen.length > 0 ? (
-        <ul className="space-y-2 rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm">
+        <ul className="mt-12 space-y-4">
           {zeilen.map((z) => (
-            <li
-              key={z.timerKey ?? z.id}
-              className="flex flex-col gap-2 border-b border-zinc-100 py-2 last:border-0"
-            >
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <span className="truncate font-medium text-zinc-800">{z.name}</span>
-                <span className="shrink-0 text-xs text-zinc-500">
-                  {z.phase === "wartet" && "Wartet …"}
-                  {z.phase === "lädt" && (
-                    <>
-                      Wird hochgeladen …
-                      {z.progressPercent != null ? ` ${z.progressPercent}%` : ""}
-                    </>
-                  )}
-                  {z.phase === "analysiert" && (
-                    <>
-                      KI-Analyse …
-                      {z.progressPercent != null ? ` ${z.progressPercent}%` : ""}
-                    </>
-                  )}
-                  {z.phase === "fertig" && (
-                    <>
-                      Fertig
-                      {z.progressPercent != null ? ` ${z.progressPercent}%` : ""}
-                    </>
-                  )}
-                  {z.phase === "fehler" && (
-                    <span className="text-red-600">
-                      {z.nachricht ?? "Fehler"}
-                      {z.duplicateOfId ? (
-                        <>
-                          {" "}
-                          <Link
-                            href={`/documents/${z.duplicateOfId}`}
-                            className="font-medium text-zinc-900 underline-offset-2 hover:underline"
-                          >
-                            Zum bestehenden Eintrag
-                          </Link>
-                          {z.duplicateLabel ? (
-                            <span className="block text-zinc-600">
-                              ({z.duplicateLabel})
-                            </span>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </span>
-                  )}
-                </span>
-              </div>
-              {(z.phase === "lädt" || z.phase === "analysiert" || z.phase === "fertig") &&
-                z.progressPercent != null && (
-                  <div className="w-full">
-                    <div
-                      className="h-2 w-full overflow-hidden rounded-full bg-zinc-100"
-                      role="progressbar"
-                      aria-valuenow={z.progressPercent}
-                      aria-valuemin={1}
-                      aria-valuemax={100}
-                      aria-label="Fortschritt Upload und Analyse"
-                    >
-                      <div
-                        className="h-full rounded-full bg-zinc-900 transition-[width] duration-200 ease-out"
-                        style={{ width: `${z.progressPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-            </li>
+            <UploadProgressCard key={z.timerKey ?? z.id} z={z} />
           ))}
         </ul>
       ) : null}
 
-      <p className="text-center text-sm">
-        <Link href="/dashboard" className="text-zinc-600 underline-offset-2 hover:underline">
-          Zurück zum Dashboard
+      <p className="mt-12 text-center text-xs text-zinc-500">Deine Dokumente werden sicher gespeichert.</p>
+
+      <p className="mt-8 text-center text-sm">
+        <Link href="/dashboard" className="font-medium text-zinc-600 underline-offset-4 hover:text-zinc-900 hover:underline">
+          Zum Dashboard
         </Link>
       </p>
-    </div>
+    </main>
   );
 }
