@@ -144,7 +144,7 @@ export function DocumentsReadonlyTable({ rows }: { rows: EditableGridRow[] }) {
                   onClick={(e) => {
                     const t = e.target as HTMLElement;
                     if (t.closest("a, button, textarea, input, select, [role='dialog']")) return;
-                    router.push(`/documents/${row.id}`);
+                    router.push(`/dashboard?focus=${encodeURIComponent(row.id)}`);
                   }}
                 >
                   <td className="px-4 py-4 align-top sm:px-5">
@@ -214,7 +214,7 @@ export function DocumentsReadonlyTable({ rows }: { rows: EditableGridRow[] }) {
                       <StatusBadge row={row} />
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         <Link
-                          href={`/documents/${row.id}`}
+                          href={`/dashboard?focus=${encodeURIComponent(row.id)}`}
                           onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 shadow-sm hover:border-zinc-300 hover:bg-zinc-50"
                         >

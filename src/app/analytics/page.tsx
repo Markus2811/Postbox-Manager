@@ -111,7 +111,7 @@ export default async function AnalyticsPage() {
               return (
                 <li key={doc.id}>
                   <Link
-                    href={`/documents/${doc.id}`}
+                    href={`/dashboard?focus=${encodeURIComponent(doc.id)}`}
                     className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:border-zinc-300"
                   >
                     <span
@@ -175,7 +175,7 @@ export default async function AnalyticsPage() {
                 return (
                   <li key={doc.id}>
                     <Link
-                      href={`/documents/${doc.id}`}
+                      href={`/dashboard?focus=${encodeURIComponent(doc.id)}`}
                       className="flex flex-col gap-1 px-4 py-3 transition hover:bg-zinc-50 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="min-w-0">

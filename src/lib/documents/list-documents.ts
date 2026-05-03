@@ -12,6 +12,7 @@ const META = `
     document_type,
     amount,
     currency,
+    confidence,
     raw_ai_json
 `;
 
@@ -22,6 +23,9 @@ const DOC_SELECT_BASE = `
   status,
   original_filename,
   created_at,
+  updated_at,
+  mime_type,
+  file_size,
   document_metadata (
 ${META}
   )
@@ -34,6 +38,9 @@ const DOC_SELECT_FULL = `
   status,
   original_filename,
   created_at,
+  updated_at,
+  mime_type,
+  file_size,
   workspace_bucket,
   user_edited_at,
   document_metadata (
@@ -48,6 +55,9 @@ export type DocumentListRowRaw = {
   status: string;
   original_filename: string;
   created_at: string;
+  updated_at?: string;
+  mime_type?: string | null;
+  file_size?: number | null;
   workspace_bucket?: string | null;
   user_edited_at?: string | null;
   document_metadata:
@@ -61,6 +71,7 @@ export type DocumentListRowRaw = {
         document_type: string | null;
         amount: number | string | null;
         currency: string | null;
+        confidence?: number | string | null;
         raw_ai_json?: unknown;
       }
     | {
@@ -73,6 +84,7 @@ export type DocumentListRowRaw = {
         document_type: string | null;
         amount: number | string | null;
         currency: string | null;
+        confidence?: number | string | null;
         raw_ai_json?: unknown;
       }[]
     | null;

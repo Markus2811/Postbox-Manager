@@ -1,14 +1,15 @@
 "use client";
 
+import { DocumentReanalyzeButton } from "@/components/document-reanalyze-button";
 import { DashboardWorkspaceToggle } from "@/components/dashboard-workspace-toggle";
+import { formatAiRawJsonAsPlainGerman } from "@/lib/documents/ai-metadata-plain-de";
 import type { DashboardDocumentRow } from "@/lib/documents/dashboard-row";
 import { documentTypeUiLabel } from "@/lib/documents/categories";
 import { addDaysToYmd, compareYmd, formatCurrency, formatDate, todayYmd } from "@/lib/documents/format";
 import { humanizeDocumentTitle } from "@/lib/documents/humanize-title";
 import { documentStatusUiLabel } from "@/lib/documents/ui-labels";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function dueUrgency(due: string | null | undefined): "overdue" | "soon" | "neutral" | "empty" {
   if (!due?.trim()) return "empty";
@@ -113,9 +114,35 @@ function StatusBadges({
   );
 }
 
-export function DashboardDocumentList({ documents }: { documents: DashboardDocumentRow[] }) {
-  const router = useRouter();
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+export function DashboardDocumentList({
+  documents,
+  initialExpandedDocumentId,
+}: {
+  documents: DashboardDocumentRow[];
+  initialExpandedDocumentId?: string | null;
+}) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const id = initialExpandedDocumentId?.trim();
+    if (id && documents.some((d) => d.id === id)) return { [id]: true };
+    return {};
+  });
+
+  useEffect(() => {
+    const id = initialExpandedDocumentId?.trim();
+    if (!id || !documents.some((d) => d.id === id)) return;
+    setExpanded((p) => ({ ...p, [id]: true }));
+  }, [initialExpandedDocumentId, documents]);
+
+  const cardRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+  useEffect(() => {
+    const id = initialExpandedDocumentId?.trim();
+    if (!id || !documents.some((d) => d.id === id)) return;
+    const t = window.setTimeout(() => {
+      cardRefs.current.get(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [initialExpandedDocumentId, documents]);
+
   const sums = useMemo(() => sumByCurrency(documents), [documents]);
 
   function toggleExpand(id: string) {
@@ -155,28 +182,42 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
           const u = dueUrgency(m?.due_date);
           const open = !!expanded[doc.id];
           const sender = m?.sender?.trim() || "";
+          const amountOverview =
+            m?.amount != null && !Number.isNaN(Number(m.amount))
+              ? formatCurrency(Number(m.amount), m.currency ?? "EUR")
+              : null;
+          const aiPlainExtra =
+            doc.raw_ai_json && Object.keys(doc.raw_ai_json).length > 0
+              ? formatAiRawJsonAsPlainGerman(doc.raw_ai_json)
+              : "";
 
           return (
-            <li key={doc.id}>
+            <li
+              key={doc.id}
+              ref={(el) => {
+                if (el) cardRefs.current.set(doc.id, el);
+                else cardRefs.current.delete(doc.id);
+              }}
+            >
               <article
                 className={`cursor-pointer overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm ring-1 ring-zinc-100/80 transition hover:border-zinc-300 hover:shadow-md ${
                   idx % 2 === 1 ? "bg-zinc-50/40" : ""
                 }`}
                 onClick={(e) => {
                   const t = e.target as HTMLElement;
-                  if (t.closest("a, button, textarea, input, select, [role='dialog']")) return;
-                  router.push(`/documents/${doc.id}`);
+                  if (
+                    t.closest(
+                      "a, button, textarea, input, select, [role='dialog'], [data-no-row-toggle]"
+                    )
+                  ) {
+                    return;
+                  }
+                  toggleExpand(doc.id);
                 }}
               >
                 <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-start lg:gap-6">
-                  {/* Links: Titel, Notizen, Absender */}
                   <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/documents/${doc.id}`}
-                      className="block text-base font-semibold leading-snug text-zinc-900 line-clamp-2 hover:text-sky-900 hover:underline"
-                    >
-                      {title}
-                    </Link>
+                    <p className="text-base font-semibold leading-snug text-zinc-900 line-clamp-2">{title}</p>
                     <NotesPreview text={doc.completion_note} />
                     <p
                       className={`mt-2 text-sm ${sender ? "text-zinc-500" : "text-zinc-400"}`}
@@ -186,7 +227,6 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
                     </p>
                   </div>
 
-                  {/* Mitte: Betrag & Frist */}
                   <div className="flex shrink-0 flex-row gap-8 sm:gap-10 lg:flex-col lg:items-end lg:gap-3 lg:text-right">
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 lg:text-right">
@@ -208,19 +248,12 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
                     </div>
                   </div>
 
-                  {/* Rechts: Status, Aktionen */}
                   <div className="flex shrink-0 flex-col gap-3 border-t border-zinc-100 pt-4 lg:border-t-0 lg:pt-0">
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       <StatusBadges workspace={doc.workspace_bucket} actionRequired={!!m?.action_required} />
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                      <Link
-                        href={`/documents/${doc.id}`}
-                        className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
-                      >
-                        Ansehen
-                      </Link>
-                      <div className="[&_button]:min-h-[2.25rem]">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <div className="[&_button]:min-h-[2.25rem]" data-no-row-toggle>
                         <DashboardWorkspaceToggle documentId={doc.id} workspace={doc.workspace_bucket} />
                       </div>
                     </div>
@@ -240,76 +273,184 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
                 </div>
 
                 {open ? (
-                  <div className="border-t border-zinc-100 px-4 py-4 sm:px-5">
-                    <dl className="grid gap-4 text-sm sm:grid-cols-2">
-                      <div>
-                        <dt className="text-xs font-medium text-zinc-500">Kategorie</dt>
-                        <dd className="mt-1 text-zinc-800">{doc.category?.trim() || "—"}</dd>
+                  <div
+                    className="border-t border-zinc-100 bg-white px-4 py-6 sm:px-6"
+                    data-no-row-toggle
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <section className="space-y-3" aria-labelledby={`overview-${doc.id}`}>
+                      <h2 id={`overview-${doc.id}`} className="text-base font-semibold text-zinc-900">
+                        Übersicht
+                      </h2>
+                      <div className="rounded-2xl bg-zinc-50/80 p-5 ring-1 ring-zinc-200/60">
+                        <dl className="grid gap-5 sm:grid-cols-2">
+                          <div>
+                            <dt className="text-xs font-medium text-zinc-500">Ablage</dt>
+                            <dd className="mt-1 text-sm font-semibold text-zinc-900">
+                              {doc.workspace_bucket === "done" ? "Erledigt" : "Posteingang"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium text-zinc-500">Frist</dt>
+                            <dd className="mt-1 text-sm font-semibold text-zinc-900">
+                              {m?.due_date ? formatDate(m.due_date) : "—"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium text-zinc-500">Betrag</dt>
+                            <dd className="mt-1 text-sm font-semibold text-zinc-900">{amountOverview ?? "—"}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium text-zinc-500">Absender</dt>
+                            <dd className="mt-1 text-sm text-zinc-800">{m?.sender?.trim() || "—"}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium text-zinc-500">Kategorie</dt>
+                            <dd className="mt-1 text-sm text-zinc-800">{doc.category ?? "—"}</dd>
+                          </div>
+                          {doc.completion_note?.trim() ? (
+                            <div className="sm:col-span-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-950 ring-1 ring-emerald-200/80">
+                              <dt className="text-xs font-medium text-emerald-800">Notiz beim Erledigen</dt>
+                              <dd className="mt-1 whitespace-pre-wrap">{doc.completion_note.trim()}</dd>
+                            </div>
+                          ) : null}
+                          {m?.action_required ? (
+                            <div className="sm:col-span-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200/80">
+                              <span className="font-semibold">Handlung nötig</span>
+                              {m.action_description ? ` — ${m.action_description}` : null}
+                            </div>
+                          ) : null}
+                          {m?.summary ? (
+                            <div className="sm:col-span-2">
+                              <dt className="text-xs font-medium text-zinc-500">Kurzüberblick</dt>
+                              <dd className="mt-1 text-sm leading-relaxed text-zinc-700">{m.summary}</dd>
+                            </div>
+                          ) : null}
+                        </dl>
                       </div>
-                      <div>
-                        <dt className="text-xs font-medium text-zinc-500">Dokumentart (KI)</dt>
-                        <dd className="mt-1 text-zinc-800">
-                          {m?.document_type ? documentTypeUiLabel(m.document_type) : "—"}
-                        </dd>
+                    </section>
+
+                    <section className="mt-8 space-y-3" aria-labelledby={`file-${doc.id}`}>
+                      <h2 id={`file-${doc.id}`} className="text-base font-semibold text-zinc-900">
+                        Dokument
+                      </h2>
+                      <div className="rounded-2xl bg-zinc-50/80 p-5 ring-1 ring-zinc-200/60">
+                        <a
+                          href={`/api/documents/${doc.id}/download`}
+                          className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
+                        >
+                          Herunterladen
+                        </a>
+                        <p className="mt-3 text-xs text-zinc-500">Sicherer Link, kurz gültig.</p>
+                        <DocumentReanalyzeButton documentId={doc.id} userEditedAt={doc.user_edited_at} />
                       </div>
-                      <div>
-                        <dt className="text-xs font-medium text-zinc-500">Belegdatum</dt>
-                        <dd className="mt-1 text-zinc-800">
-                          {m?.document_date ? formatDate(m.document_date) : "—"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium text-zinc-500">Hochgeladen</dt>
-                        <dd className="mt-1 text-zinc-800">
-                          {new Date(doc.created_at).toLocaleString("de-DE")}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium text-zinc-500">Auswertung</dt>
-                        <dd className="mt-1 text-zinc-800">{documentStatusUiLabel(doc.status)}</dd>
-                      </div>
-                      {(doc.payment_payer || doc.payment_recipient) && (
-                        <div className="sm:col-span-2">
-                          <dt className="text-xs font-medium text-zinc-500">Zahlung</dt>
-                          <dd className="mt-1 space-y-1 text-zinc-800">
-                            {doc.payment_payer ? (
-                              <p>
-                                <span className="text-zinc-500">Zahler: </span>
-                                {doc.payment_payer}
-                              </p>
+                    </section>
+
+                    <details className="group mt-8 rounded-2xl bg-zinc-50/50 ring-1 ring-zinc-200/60">
+                      <summary className="cursor-pointer list-none px-5 py-4 text-base font-semibold text-zinc-900 marker:hidden [&::-webkit-details-marker]:hidden">
+                        <span className="flex items-center justify-between gap-3">
+                          Details
+                          <span className="text-sm font-medium text-zinc-500 group-open:hidden">Anzeigen</span>
+                          <span className="hidden text-sm font-medium text-zinc-500 group-open:inline">
+                            Ausblenden
+                          </span>
+                        </span>
+                      </summary>
+                      <div className="space-y-6 border-t border-zinc-100 px-5 py-5">
+                        {m ? (
+                          <div className="space-y-3">
+                            <h3 className="text-sm font-semibold text-zinc-800">Auswertung</h3>
+                            <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                              <div>
+                                <dt className="text-xs font-medium text-zinc-500">Dokumentart (KI)</dt>
+                                <dd className="mt-1 text-zinc-800">
+                                  {documentTypeUiLabel(m.document_type)}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-xs font-medium text-zinc-500">Dokumentdatum</dt>
+                                <dd className="mt-1 text-zinc-800">
+                                  {m.document_date ? formatDate(m.document_date) : "—"}
+                                </dd>
+                              </div>
+                            </dl>
+                          </div>
+                        ) : null}
+
+                        <div>
+                          <h3 className="text-sm font-semibold text-zinc-800">Technische Angaben</h3>
+                          <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                            <div>
+                              <dt className="text-xs font-medium text-zinc-500">Auswertung</dt>
+                              <dd className="mt-1 text-zinc-800">{documentStatusUiLabel(doc.status)}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium text-zinc-500">Hochgeladen</dt>
+                              <dd className="mt-1 text-zinc-800">
+                                {new Date(doc.created_at).toLocaleString("de-DE")}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium text-zinc-500">Zuletzt geändert</dt>
+                              <dd className="mt-1 text-zinc-800">
+                                {new Date(doc.updated_at).toLocaleString("de-DE")}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium text-zinc-500">Dateityp</dt>
+                              <dd className="mt-1 text-zinc-800">{doc.mime_type ?? "—"}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium text-zinc-500">Größe</dt>
+                              <dd className="mt-1 text-zinc-800">
+                                {doc.file_size != null ? `${(doc.file_size / 1024).toFixed(1)} KB` : "—"}
+                              </dd>
+                            </div>
+                            {m?.confidence != null && !Number.isNaN(Number(m.confidence)) ? (
+                              <div>
+                                <dt className="text-xs font-medium text-zinc-500">Zuverlässigkeit (KI)</dt>
+                                <dd className="mt-1 text-zinc-800">
+                                  {Math.round(Number(m.confidence) * 100)} %
+                                </dd>
+                              </div>
                             ) : null}
-                            {doc.payment_recipient ? (
-                              <p>
-                                <span className="text-zinc-500">Empfänger: </span>
-                                {doc.payment_recipient}
-                              </p>
-                            ) : null}
-                          </dd>
+                          </dl>
                         </div>
-                      )}
-                      {m?.action_required && m.action_description?.trim() ? (
-                        <div className="sm:col-span-2">
-                          <dt className="text-xs font-medium text-zinc-500">Handlung</dt>
-                          <dd className="mt-1 text-zinc-800">{m.action_description.trim()}</dd>
-                        </div>
-                      ) : null}
-                      {m?.summary?.trim() ? (
-                        <div className="sm:col-span-2">
-                          <dt className="text-xs font-medium text-zinc-500">Kurzüberblick</dt>
-                          <dd className="mt-1 whitespace-pre-wrap leading-relaxed text-zinc-700">
-                            {m.summary.trim()}
-                          </dd>
-                        </div>
-                      ) : null}
-                      {doc.completion_note?.trim() ? (
-                        <div className="sm:col-span-2">
-                          <dt className="text-xs font-medium text-zinc-500">Notiz (vollständig)</dt>
-                          <dd className="mt-1 whitespace-pre-wrap leading-relaxed text-zinc-700">
-                            {doc.completion_note.trim()}
-                          </dd>
-                        </div>
-                      ) : null}
-                    </dl>
+
+                        {(doc.payment_payer || doc.payment_recipient) && (
+                          <div>
+                            <h3 className="text-sm font-semibold text-zinc-800">Zahlung</h3>
+                            <dl className="mt-2 space-y-2 text-sm">
+                              {doc.payment_payer ? (
+                                <div>
+                                  <dt className="text-xs font-medium text-zinc-500">Zahler</dt>
+                                  <dd className="text-zinc-800">{doc.payment_payer}</dd>
+                                </div>
+                              ) : null}
+                              {doc.payment_recipient ? (
+                                <div>
+                                  <dt className="text-xs font-medium text-zinc-500">Empfänger</dt>
+                                  <dd className="text-zinc-800">{doc.payment_recipient}</dd>
+                                </div>
+                              ) : null}
+                            </dl>
+                          </div>
+                        )}
+
+                        {aiPlainExtra ? (
+                          <div>
+                            <h3 className="text-sm font-semibold text-zinc-800">Auswertung (Details)</h3>
+                            <p className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white p-4 text-sm leading-relaxed text-zinc-700 ring-1 ring-zinc-200/80">
+                              {aiPlainExtra}
+                            </p>
+                          </div>
+                        ) : null}
+
+                        {!m ? (
+                          <p className="text-sm text-zinc-500">Für dieses Dokument liegt noch keine Auswertung vor.</p>
+                        ) : null}
+                      </div>
+                    </details>
                   </div>
                 ) : null}
               </article>

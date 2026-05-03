@@ -428,7 +428,7 @@ export function UploadClient() {
                         <>
                           {" "}
                           <Link
-                            href={`/documents/${z.duplicateOfId}`}
+                            href={`/dashboard?focus=${encodeURIComponent(z.duplicateOfId)}`}
                             className="font-medium text-zinc-900 underline-offset-2 hover:underline"
                           >
                             Zum bestehenden Eintrag

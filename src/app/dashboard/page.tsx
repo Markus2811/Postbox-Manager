@@ -23,6 +23,8 @@ function normalizeMeta(
   if (!meta) return null;
   const m = Array.isArray(meta) ? (meta[0] ?? null) : meta;
   if (!m) return null;
+  const c = m.confidence;
+  const confNum = c != null && !Number.isNaN(Number(c)) ? Number(c) : null;
   return {
     due_date: m.due_date,
     action_required: m.action_required,
@@ -33,6 +35,7 @@ function normalizeMeta(
     sender: m.sender ?? null,
     amount: m.amount ?? null,
     currency: m.currency ?? null,
+    confidence: confNum,
   };
 }
 
@@ -52,6 +55,10 @@ function toRows(raw: DocumentListRowRaw[]): DashboardDocumentRow[] {
         ? (m.raw_ai_json as Record<string, unknown>)
         : null
     );
+    const raw =
+      m?.raw_ai_json && typeof m.raw_ai_json === "object" && !Array.isArray(m.raw_ai_json)
+        ? (m.raw_ai_json as Record<string, unknown>)
+        : null;
     return {
       id: d.id,
       display_name: d.display_name,
@@ -59,18 +66,22 @@ function toRows(raw: DocumentListRowRaw[]): DashboardDocumentRow[] {
       status: d.status,
       original_filename: d.original_filename,
       created_at: d.created_at,
+      updated_at: d.updated_at ?? d.created_at,
+      mime_type: d.mime_type ?? null,
+      file_size: d.file_size ?? null,
       workspace_bucket: workspaceOf(d),
       user_edited_at: d.user_edited_at ?? null,
       completion_note: completionNoteFromListMeta(d.document_metadata),
       payment_payer: hints.payer.trim() || null,
       payment_recipient: hints.recipient.trim() || null,
+      raw_ai_json: raw,
       document_metadata: normalizeMeta(d.document_metadata),
     };
   });
 }
 
 type PageProps = {
-  searchParams: Promise<{ q?: string; ablage?: string }>;
+  searchParams: Promise<{ q?: string; ablage?: string; focus?: string }>;
 };
 
 export default async function DashboardPage({ searchParams }: PageProps) {
@@ -85,6 +96,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   }
 
   const q = sp.q?.trim() ?? "";
+  const focusDocId = sp.focus?.trim() || null;
   const ablageParam = sp.ablage;
   const activeAblage =
     ablageParam === "done" ? "done" : ablageParam === "inbox" ? "inbox" : "alle";
@@ -135,7 +147,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
         <DashboardAblageFilter activeAblage={activeAblage} />
 
-        <DashboardDocumentList documents={documents} />
+        <DashboardDocumentList documents={documents} initialExpandedDocumentId={focusDocId} />
       </main>
     </div>
   );
