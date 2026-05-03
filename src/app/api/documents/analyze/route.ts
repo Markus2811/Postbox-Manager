@@ -9,6 +9,18 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
+/** Produktions-DB ohne Migration: PostgREST/Postgres meldet fehlende Spalte extracted_text. */
+function isMissingExtractedTextColumn(message: string): boolean {
+  const m = message.toLowerCase();
+  if (!m.includes("extracted_text")) return false;
+  return (
+    m.includes("does not exist") ||
+    m.includes("could not find") ||
+    m.includes("schema cache") ||
+    m.includes("unknown column")
+  );
+}
+
 type AnalyzeBody = {
   documentId?: string;
   manualText?: string;
@@ -127,25 +139,35 @@ export async function POST(request: Request) {
       }
     }
 
-    const { error: metaError } = await supabase.from("document_metadata").upsert(
-      {
-        document_id: doc.id,
-        user_id: user.id,
-        document_type: analysis.document_type,
-        sender: analysis.sender,
-        document_date: analysis.document_date,
-        due_date: analysis.due_date,
-        amount: analysis.amount,
-        currency: analysis.currency,
-        summary: analysis.summary,
-        action_required: analysis.action_required,
-        action_description: analysis.action_description,
-        confidence: analysis.confidence,
-        raw_ai_json: rawPayload,
-        extracted_text: extractedTextForDb.length > 0 ? extractedTextForDb : null,
-      },
-      { onConflict: "document_id" }
-    );
+    const metaBase = {
+      document_id: doc.id,
+      user_id: user.id,
+      document_type: analysis.document_type,
+      sender: analysis.sender,
+      document_date: analysis.document_date,
+      due_date: analysis.due_date,
+      amount: analysis.amount,
+      currency: analysis.currency,
+      summary: analysis.summary,
+      action_required: analysis.action_required,
+      action_description: analysis.action_description,
+      confidence: analysis.confidence,
+      raw_ai_json: rawPayload,
+    };
+
+    let metaError = (
+      await supabase.from("document_metadata").upsert(
+        {
+          ...metaBase,
+          extracted_text: extractedTextForDb.length > 0 ? extractedTextForDb : null,
+        },
+        { onConflict: "document_id" }
+      )
+    ).error;
+
+    if (metaError && isMissingExtractedTextColumn(metaError.message ?? "")) {
+      metaError = (await supabase.from("document_metadata").upsert(metaBase, { onConflict: "document_id" })).error;
+    }
 
     if (metaError) {
       throw metaError;
