@@ -80,15 +80,15 @@ export default async function DocumentDetailPage({
         </div>
 
         <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-          <strong className="font-semibold">Ablage (erledigt / offen):</strong> im{" "}
+          <strong className="font-semibold">Ablage (erledigt / offen):</strong> ändern im{" "}
           <Link href="/dashboard" className="font-medium underline-offset-2 hover:underline">
             Dashboard
-          </Link>{" "}
-          oder in der{" "}
+          </Link>
+          . In der{" "}
           <Link href="/dokumentenliste" className="font-medium underline-offset-2 hover:underline">
             Dokumentenliste
-          </Link>
-          .
+          </Link>{" "}
+          siehst du den Stand in der Spalte „Ablage“.
         </div>
 
         <section className="space-y-3" aria-labelledby="sec-overview">

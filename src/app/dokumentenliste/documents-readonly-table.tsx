@@ -1,7 +1,6 @@
 "use client";
 
 import type { EditableGridRow } from "@/app/dokumentenliste/editable-documents-table";
-import { DashboardWorkspaceToggle } from "@/components/dashboard-workspace-toggle";
 import { documentTypeUiLabel } from "@/lib/documents/categories";
 import { formatCurrency, formatDate } from "@/lib/documents/format";
 import Link from "next/link";
@@ -137,12 +136,7 @@ export function DocumentsReadonlyTable({ rows }: { rows: EditableGridRow[] }) {
                     Detail
                   </Link>
                 </td>
-                <Cell className="whitespace-nowrap">
-                  <span className="block text-zinc-600">{row.workspace_label}</span>
-                  <div className="mt-1" onClick={(e) => e.stopPropagation()}>
-                    <DashboardWorkspaceToggle documentId={row.id} workspace={row.workspace_bucket} />
-                  </div>
-                </Cell>
+                <Cell className="whitespace-nowrap text-zinc-600">{row.workspace_label}</Cell>
                 <Cell title={row.original_filename}>
                   <span className="line-clamp-2">{truncate(row.original_filename, 80)}</span>
                 </Cell>
