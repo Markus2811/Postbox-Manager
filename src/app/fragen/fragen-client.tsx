@@ -1,10 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+
+export type AskSource = { id: string; title: string };
 
 export function FragenClient() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
+  const [sources, setSources] = useState<AskSource[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -12,6 +16,7 @@ export function FragenClient() {
     e.preventDefault();
     setError(null);
     setAnswer(null);
+    setSources(null);
     setBusy(true);
     const res = await fetch("/api/documents/ask", {
       method: "POST",
@@ -20,6 +25,7 @@ export function FragenClient() {
     });
     const body = (await res.json().catch(() => ({}))) as {
       answer?: string;
+      sources?: AskSource[];
       error?: string;
     };
     setBusy(false);
@@ -28,6 +34,7 @@ export function FragenClient() {
       return;
     }
     setAnswer(body.answer ?? "");
+    setSources(Array.isArray(body.sources) ? body.sources : []);
   }
 
   return (
@@ -63,8 +70,36 @@ export function FragenClient() {
         </p>
       ) : null}
       {answer ? (
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm leading-relaxed text-zinc-800 shadow-sm">
-          {answer}
+        <div className="space-y-4">
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm leading-relaxed text-zinc-800 shadow-sm">
+            {answer}
+          </div>
+          {sources && sources.length > 0 ? (
+            <div className="rounded-xl border border-zinc-200/90 bg-zinc-50/80 p-4 shadow-sm ring-1 ring-zinc-100/80">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Berücksichtigte Dokumente
+              </p>
+              <p className="mt-1 text-xs text-zinc-600">
+                Die Antwort stützt sich auf Metadaten und Textauszüge aus genau diesen Dokumenten (Kontext
+                dieser Anfrage). Zum Nachlesen im Original:
+              </p>
+              <ul className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
+                {sources.map((s) => (
+                  <li key={s.id} className="flex flex-wrap items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-sm text-zinc-800" title={s.title}>
+                      {s.title}
+                    </span>
+                    <Link
+                      href={`/documents/${s.id}`}
+                      className="shrink-0 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm hover:border-zinc-300 hover:bg-zinc-50"
+                    >
+                      Öffnen
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </form>

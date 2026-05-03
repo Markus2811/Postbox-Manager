@@ -7,6 +7,7 @@ import {
   nextCalendarWeekMonSun,
   type AskDocRow,
 } from "@/lib/documents/ask-helpers";
+import { humanizeDocumentTitle } from "@/lib/documents/humanize-title";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
@@ -170,6 +171,10 @@ export async function POST(request: Request) {
   }
 
   const forContext = filtered.length > 0 ? filtered : rawRows.slice(0, 150);
+  const sources = forContext.map((r) => ({
+    id: r.id,
+    title: humanizeDocumentTitle(r.display_name, r.original_filename),
+  }));
   const fullTextBudget = { remaining: ASK_CONTEXT_EXTRACT_TOTAL };
   const blocks = forContext.map((r, i) => formatAskContextBlock(r, i, fullTextBudget));
 
@@ -210,5 +215,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Leere Modell-Antwort" }, { status: 500 });
   }
 
-  return NextResponse.json({ answer });
+  return NextResponse.json({ answer, sources });
 }
