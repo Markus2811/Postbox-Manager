@@ -97,9 +97,6 @@ export function DocumentsReadonlyTable({ rows }: { rows: EditableGridRow[] }) {
             <th className="whitespace-nowrap border-b border-zinc-200 px-2 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-600">
               Vertrauen
             </th>
-            <th className="whitespace-nowrap border-b border-zinc-200 px-2 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-600">
-              Dokument-ID
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -168,7 +165,6 @@ export function DocumentsReadonlyTable({ rows }: { rows: EditableGridRow[] }) {
                 <Cell title={sum}>{truncate(sum, 160) || "—"}</Cell>
                 <Cell title={note}>{truncate(note, 120) || "—"}</Cell>
                 <Cell className="whitespace-nowrap">{confPct}</Cell>
-                <Cell className="font-mono text-[11px] text-zinc-500">{row.id}</Cell>
               </tr>
             );
           })}
