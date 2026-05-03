@@ -10,6 +10,7 @@ import { DashboardSearch } from "@/components/dashboard-search";
 import { computeDashboardSummary, workspaceOf } from "@/lib/documents/dashboard-metrics";
 import type { DocumentListRowRaw } from "@/lib/documents/list-documents";
 import { listDocumentsForUser } from "@/lib/documents/list-documents";
+import { paymentHintsFromRaw } from "@/lib/documents/table-export";
 import { completionNoteFromRawAi } from "@/lib/documents/workspace-mvp";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -43,18 +44,29 @@ function completionNoteFromListMeta(meta: DocumentListRowRaw["document_metadata"
 }
 
 function toRows(raw: DocumentListRowRaw[]): DashboardDocumentRow[] {
-  return raw.map((d) => ({
-    id: d.id,
-    display_name: d.display_name,
-    category: d.category,
-    status: d.status,
-    original_filename: d.original_filename,
-    created_at: d.created_at,
-    workspace_bucket: workspaceOf(d),
-    user_edited_at: d.user_edited_at ?? null,
-    completion_note: completionNoteFromListMeta(d.document_metadata),
-    document_metadata: normalizeMeta(d.document_metadata),
-  }));
+  return raw.map((d) => {
+    const metaRaw = d.document_metadata;
+    const m = Array.isArray(metaRaw) ? (metaRaw[0] ?? null) : metaRaw;
+    const hints = paymentHintsFromRaw(
+      m?.raw_ai_json && typeof m.raw_ai_json === "object" && !Array.isArray(m.raw_ai_json)
+        ? (m.raw_ai_json as Record<string, unknown>)
+        : null
+    );
+    return {
+      id: d.id,
+      display_name: d.display_name,
+      category: d.category,
+      status: d.status,
+      original_filename: d.original_filename,
+      created_at: d.created_at,
+      workspace_bucket: workspaceOf(d),
+      user_edited_at: d.user_edited_at ?? null,
+      completion_note: completionNoteFromListMeta(d.document_metadata),
+      payment_payer: hints.payer.trim() || null,
+      payment_recipient: hints.recipient.trim() || null,
+      document_metadata: normalizeMeta(d.document_metadata),
+    };
+  });
 }
 
 type PageProps = {
@@ -101,9 +113,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dashboard</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">
-              Übersicht aller Dokumente. <strong className="font-medium text-zinc-800">Erledigt / Wieder öffnen</strong>{" "}
-              nur hier in der Spalte „Ablage“ – inkl. optionaler Notiz beim Erledigen. Manuelle Korrekturen der
-              KI-Felder in der{" "}
+              Schnellüberblick: Titel, Absender, Betrag, Frist und Notizen. Als erledigt markieren direkt in der
+              Zeile. Ausführliche Felder und Bearbeitung in der{" "}
               <Link href="/dokumentenliste" className="font-medium text-zinc-900 underline-offset-2 hover:underline">
                 Dokumentenliste
               </Link>

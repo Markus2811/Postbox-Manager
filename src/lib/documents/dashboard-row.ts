@@ -11,6 +11,9 @@ export type DashboardDocumentRow = {
   user_edited_at: string | null;
   /** Notiz beim Erledigen (`raw_ai_json._postbox.completion_note`). */
   completion_note: string | null;
+  /** Nur für erweiterte Zeilenansicht; aus bestehendem KI-Roh-JSON abgeleitet. */
+  payment_payer: string | null;
+  payment_recipient: string | null;
   document_metadata: {
     due_date: string | null;
     action_required: boolean;

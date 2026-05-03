@@ -2,27 +2,13 @@
 
 import { DashboardWorkspaceToggle } from "@/components/dashboard-workspace-toggle";
 import type { DashboardDocumentRow } from "@/lib/documents/dashboard-row";
+import { documentTypeUiLabel } from "@/lib/documents/categories";
 import { addDaysToYmd, compareYmd, formatCurrency, formatDate, todayYmd } from "@/lib/documents/format";
 import { humanizeDocumentTitle } from "@/lib/documents/humanize-title";
+import { documentStatusUiLabel } from "@/lib/documents/ui-labels";
 import Link from "next/link";
-import { Fragment, useMemo, useState } from "react";
-
-function EmptyCell() {
-  return <span className="select-none text-[11px] text-zinc-200">·</span>;
-}
-
-function categoryGlyph(category: string | null | undefined): string | null {
-  if (!category?.trim()) return null;
-  const c = category.trim();
-  if (c.includes("Rechnung")) return "€";
-  if (c.includes("Vertrag")) return "◇";
-  if (c.includes("Versicherung")) return "◆";
-  if (c.includes("Bank") || c.includes("Finanz")) return "◎";
-  if (c.includes("Steuer")) return "§";
-  if (c.includes("Gesundheit")) return "+";
-  if (c.includes("Behörde")) return "⌂";
-  return "○";
-}
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
 function dueUrgency(due: string | null | undefined): "overdue" | "soon" | "neutral" | "empty" {
   if (!due?.trim()) return "empty";
@@ -35,16 +21,16 @@ function dueUrgency(due: string | null | undefined): "overdue" | "soon" | "neutr
   return "neutral";
 }
 
-function dueCellClass(u: ReturnType<typeof dueUrgency>): string {
+function dueLabelClass(u: ReturnType<typeof dueUrgency>): string {
   switch (u) {
     case "overdue":
       return "font-semibold text-red-600";
     case "soon":
-      return "font-medium text-amber-700";
+      return "font-semibold text-amber-700";
     case "neutral":
-      return "text-zinc-700";
+      return "font-semibold text-zinc-800";
     default:
-      return "text-zinc-400";
+      return "text-sm font-medium text-zinc-400";
   }
 }
 
@@ -72,8 +58,8 @@ function sumByCurrency(docs: DashboardDocumentRow[]): { currency: string; total:
 function Chevron({ open }: { open: boolean }) {
   return (
     <svg
-      width="14"
-      height="14"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -86,35 +72,59 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-function EyeIcon() {
+function NotesPreview({ text }: { text: string | null }) {
+  const t = text?.trim();
+  if (!t) {
+    return <p className="mt-1.5 line-clamp-2 text-xs text-zinc-400">Keine Notiz</p>;
+  }
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="shrink-0 text-zinc-500 opacity-70"
-      aria-hidden
-    >
-      <path
-        d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.75" />
-    </svg>
+    <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-zinc-600" title={t}>
+      {t}
+    </p>
+  );
+}
+
+function StatusBadges({
+  workspace,
+  actionRequired,
+}: {
+  workspace: DashboardDocumentRow["workspace_bucket"];
+  actionRequired: boolean;
+}) {
+  const done = workspace === "done";
+  if (done) {
+    return (
+      <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-900 ring-1 ring-emerald-200/80">
+        Erledigt
+      </span>
+    );
+  }
+  if (actionRequired) {
+    return (
+      <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-200/80">
+        Handlung nötig
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200/80">
+      Offen
+    </span>
   );
 }
 
 export function DashboardDocumentList({ documents }: { documents: DashboardDocumentRow[] }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const sums = useMemo(() => sumByCurrency(documents), [documents]);
 
+  function toggleExpand(id: string) {
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
   if (documents.length === 0) {
     return (
-      <div className="rounded-xl bg-white px-6 py-12 text-center text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200/80">
+      <div className="rounded-2xl bg-white px-6 py-14 text-center text-sm text-zinc-600 shadow-sm ring-1 ring-zinc-200/80">
         Keine Dokumente in dieser Ansicht.
         <div className="mt-4">
           <Link href="/upload" className="font-medium text-zinc-900 underline-offset-2 hover:underline">
@@ -125,227 +135,196 @@ export function DashboardDocumentList({ documents }: { documents: DashboardDocum
     );
   }
 
-  function toggleExpand(id: string) {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
   const sumLabel =
     sums.length === 0 ? (
-      <EmptyCell />
+      <span className="text-sm font-medium text-zinc-400">Keine Beträge in der Ansicht</span>
     ) : (
-      <span className="font-semibold tabular-nums text-zinc-900">
+      <span className="text-base font-semibold tabular-nums text-zinc-900">
         {sums.map((s) => formatCurrency(s.total, s.currency)).join(" · ")}
       </span>
     );
 
   return (
     <div className="space-y-4">
-      {/* Mobile: Karten */}
-      <div className="space-y-3 md:hidden">
+      <ul className="space-y-3">
         {documents.map((doc, idx) => {
           const m = doc.document_metadata;
           const title = humanizeDocumentTitle(doc.display_name, doc.original_filename);
           const amount = parseDocAmount(doc);
           const amountStr = amount ? formatCurrency(amount.amount, amount.currency) : null;
           const u = dueUrgency(m?.due_date);
-          const glyph = categoryGlyph(doc.category);
           const open = !!expanded[doc.id];
-          return (
-            <article
-              key={doc.id}
-              className={`rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-sm ${
-                idx % 2 === 1 ? "bg-zinc-50/60" : ""
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold leading-snug text-zinc-900">{title}</p>
-                  {m?.sender?.trim() ? (
-                    <p className="mt-1 text-xs text-zinc-500">{m.sender.trim()}</p>
-                  ) : (
-                    <p className="mt-1 text-xs text-zinc-200">·</p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(doc.id)}
-                  className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-100"
-                  aria-expanded={open}
-                  aria-label={open ? "Weniger anzeigen" : "Vollständigen Titel anzeigen"}
-                >
-                  <Chevron open={open} />
-                </button>
-              </div>
-              {open ? (
-                <p className="mt-2 rounded-lg border border-zinc-100 bg-zinc-50/90 px-3 py-2 text-xs leading-relaxed text-zinc-700">
-                  {title}
-                </p>
-              ) : null}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-zinc-100 pt-3 text-sm">
-                <div>
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Frist</span>
-                  <p className={`text-sm ${dueCellClass(u)}`}>
-                    {m?.due_date ? formatDate(m.due_date) : <EmptyCell />}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Betrag</span>
-                  <p className="font-semibold tabular-nums text-zinc-900">
-                    {amountStr ?? <EmptyCell />}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-xs text-zinc-600">
-                  {glyph ? <span className="text-sm opacity-80">{glyph}</span> : null}
-                  <span>{doc.category?.trim() || <EmptyCell />}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/documents/${doc.id}`}
-                    className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-                  >
-                    <EyeIcon />
-                    Ansehen
-                  </Link>
-                  <DashboardWorkspaceToggle documentId={doc.id} workspace={doc.workspace_bucket} />
-                </div>
-              </div>
-            </article>
-          );
-        })}
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-sm">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Summe (gefiltert)</span>
-            {sumLabel}
-          </div>
-        </div>
-      </div>
+          const sender = m?.sender?.trim() || "";
 
-      {/* Desktop: Tabelle */}
-      <div className="hidden overflow-x-auto rounded-xl border border-zinc-200/90 bg-white shadow-sm md:block">
-        <table className="w-full min-w-[64rem] border-separate border-spacing-0 text-left text-sm">
-          <thead>
-            <tr>
-              <th className="sticky top-0 z-[1] rounded-tl-xl border-b border-zinc-200 bg-zinc-50/95 px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 backdrop-blur-sm">
-                Aktion
-              </th>
-              <th className="sticky top-0 z-[1] border-b border-zinc-200 bg-zinc-50/95 px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 backdrop-blur-sm">
-                Titel
-              </th>
-              <th className="sticky top-0 z-[1] border-b border-zinc-200 bg-zinc-50/95 px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 backdrop-blur-sm">
-                Frist
-              </th>
-              <th className="sticky top-0 z-[1] border-b border-zinc-200 bg-zinc-50/95 px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 backdrop-blur-sm">
-                Betrag
-              </th>
-              <th className="sticky top-0 z-[1] border-b border-zinc-200 bg-zinc-50/95 px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 backdrop-blur-sm">
-                Absender
-              </th>
-              <th className="sticky top-0 z-[1] border-b border-zinc-200 bg-zinc-50/95 px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 backdrop-blur-sm">
-                Kategorie
-              </th>
-              <th className="sticky top-0 z-[1] border-b border-zinc-200 bg-zinc-50/95 px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 backdrop-blur-sm">
-                Notizen
-              </th>
-              <th className="sticky top-0 z-[1] rounded-tr-xl border-b border-zinc-200 bg-zinc-50/95 px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 backdrop-blur-sm">
-                Ablage
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((doc, idx) => {
-              const m = doc.document_metadata;
-              const title = humanizeDocumentTitle(doc.display_name, doc.original_filename);
-              const amount = parseDocAmount(doc);
-              const amountStr = amount ? formatCurrency(amount.amount, amount.currency) : null;
-              const u = dueUrgency(m?.due_date);
-              const glyph = categoryGlyph(doc.category);
-              const open = !!expanded[doc.id];
-              const zebra = idx % 2 === 1 ? "bg-zinc-50/50" : "bg-white";
-              return (
-                <Fragment key={doc.id}>
-                  <tr
-                    className={`group border-b border-zinc-100/90 transition-colors last:border-0 ${zebra} hover:bg-zinc-100/70`}
-                  >
-                    <td className="align-top px-4 py-4">
+          return (
+            <li key={doc.id}>
+              <article
+                className={`cursor-pointer overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm ring-1 ring-zinc-100/80 transition hover:border-zinc-300 hover:shadow-md ${
+                  idx % 2 === 1 ? "bg-zinc-50/40" : ""
+                }`}
+                onClick={(e) => {
+                  const t = e.target as HTMLElement;
+                  if (t.closest("a, button, textarea, input, select, [role='dialog']")) return;
+                  router.push(`/documents/${doc.id}`);
+                }}
+              >
+                <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-start lg:gap-6">
+                  {/* Links: Titel, Notizen, Absender */}
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/documents/${doc.id}`}
+                      className="block text-base font-semibold leading-snug text-zinc-900 line-clamp-2 hover:text-sky-900 hover:underline"
+                    >
+                      {title}
+                    </Link>
+                    <NotesPreview text={doc.completion_note} />
+                    <p
+                      className={`mt-2 text-sm ${sender ? "text-zinc-500" : "text-zinc-400"}`}
+                      title={sender || undefined}
+                    >
+                      {sender || "Absender unbekannt"}
+                    </p>
+                  </div>
+
+                  {/* Mitte: Betrag & Frist */}
+                  <div className="flex shrink-0 flex-row gap-8 sm:gap-10 lg:flex-col lg:items-end lg:gap-3 lg:text-right">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 lg:text-right">
+                        Betrag
+                      </p>
+                      {amountStr ? (
+                        <p className="mt-0.5 text-lg font-bold tabular-nums text-zinc-900">{amountStr}</p>
+                      ) : (
+                        <p className="mt-0.5 text-sm font-medium text-zinc-400">Kein Betrag</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 lg:text-right">
+                        Frist
+                      </p>
+                      <p className={`mt-0.5 text-sm ${dueLabelClass(u)}`}>
+                        {m?.due_date ? formatDate(m.due_date) : "Keine Frist"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Rechts: Status, Aktionen */}
+                  <div className="flex shrink-0 flex-col gap-3 border-t border-zinc-100 pt-4 lg:border-t-0 lg:pt-0">
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      <StatusBadges workspace={doc.workspace_bucket} actionRequired={!!m?.action_required} />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       <Link
                         href={`/documents/${doc.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-1.5 py-1 text-xs font-medium text-zinc-600 underline-offset-2 hover:border-zinc-200 hover:bg-white hover:text-zinc-900 hover:underline"
+                        className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
                       >
-                        <EyeIcon />
                         Ansehen
                       </Link>
-                    </td>
-                    <td className="max-w-[min(22rem,28vw)] align-top px-4 py-4">
-                      <div className="flex items-start gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggleExpand(doc.id)}
-                          className="mt-0.5 rounded-md p-0.5 text-zinc-400 hover:bg-zinc-200/60 hover:text-zinc-700"
-                          aria-expanded={open}
-                          title={open ? "Einklappen" : "Vollständigen Titel anzeigen"}
-                        >
-                          <Chevron open={open} />
-                        </button>
-                        <div className="min-w-0 flex-1" title={open ? undefined : title}>
-                          <p
-                            className={`font-semibold leading-snug text-zinc-900 ${
-                              open ? "" : "line-clamp-2"
-                            }`}
-                          >
-                            {title}
-                          </p>
-                        </div>
+                      <div className="[&_button]:min-h-[2.25rem]">
+                        <DashboardWorkspaceToggle documentId={doc.id} workspace={doc.workspace_bucket} />
                       </div>
-                    </td>
-                    <td className={`whitespace-nowrap px-4 py-4 align-top text-sm ${dueCellClass(u)}`}>
-                      {m?.due_date ? formatDate(m.due_date) : <EmptyCell />}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-right align-top text-sm font-semibold tabular-nums text-zinc-900">
-                      {amountStr ?? <EmptyCell />}
-                    </td>
-                    <td className="max-w-[14rem] px-4 py-4 align-top">
-                      <p
-                        className="line-clamp-2 text-xs leading-relaxed text-zinc-500"
-                        title={m?.sender?.trim() || undefined}
-                      >
-                        {m?.sender?.trim() || <EmptyCell />}
-                      </p>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-4 align-top text-xs text-zinc-600">
-                      <span className="inline-flex items-center gap-1.5">
-                        {glyph ? <span className="text-sm opacity-75">{glyph}</span> : null}
-                        <span>{doc.category?.trim() || <EmptyCell />}</span>
-                      </span>
-                    </td>
-                    <td className="max-w-[12rem] px-4 py-4 align-top text-xs text-zinc-600">
-                      {doc.completion_note?.trim() ? (
-                        <span className="line-clamp-2" title={doc.completion_note}>
-                          {doc.completion_note}
-                        </span>
-                      ) : (
-                        <EmptyCell />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-2 sm:px-5">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(doc.id)}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100/80 hover:text-zinc-900"
+                    aria-expanded={open}
+                  >
+                    <Chevron open={open} />
+                    {open ? "Weniger Details" : "Weitere Details"}
+                  </button>
+                </div>
+
+                {open ? (
+                  <div className="border-t border-zinc-100 px-4 py-4 sm:px-5">
+                    <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs font-medium text-zinc-500">Kategorie</dt>
+                        <dd className="mt-1 text-zinc-800">{doc.category?.trim() || "—"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium text-zinc-500">Dokumentart (KI)</dt>
+                        <dd className="mt-1 text-zinc-800">
+                          {m?.document_type ? documentTypeUiLabel(m.document_type) : "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium text-zinc-500">Belegdatum</dt>
+                        <dd className="mt-1 text-zinc-800">
+                          {m?.document_date ? formatDate(m.document_date) : "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium text-zinc-500">Hochgeladen</dt>
+                        <dd className="mt-1 text-zinc-800">
+                          {new Date(doc.created_at).toLocaleString("de-DE")}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium text-zinc-500">Auswertung</dt>
+                        <dd className="mt-1 text-zinc-800">{documentStatusUiLabel(doc.status)}</dd>
+                      </div>
+                      {(doc.payment_payer || doc.payment_recipient) && (
+                        <div className="sm:col-span-2">
+                          <dt className="text-xs font-medium text-zinc-500">Zahlung</dt>
+                          <dd className="mt-1 space-y-1 text-zinc-800">
+                            {doc.payment_payer ? (
+                              <p>
+                                <span className="text-zinc-500">Zahler: </span>
+                                {doc.payment_payer}
+                              </p>
+                            ) : null}
+                            {doc.payment_recipient ? (
+                              <p>
+                                <span className="text-zinc-500">Empfänger: </span>
+                                {doc.payment_recipient}
+                              </p>
+                            ) : null}
+                          </dd>
+                        </div>
                       )}
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <DashboardWorkspaceToggle documentId={doc.id} workspace={doc.workspace_bucket} />
-                    </td>
-                  </tr>
-                </Fragment>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-zinc-200 bg-zinc-50/95">
-              <td colSpan={3} className="rounded-bl-xl px-4 py-3.5 text-right text-xs font-medium text-zinc-500">
-                Summe (gefiltert)
-              </td>
-              <td className="whitespace-nowrap px-4 py-3.5 text-right text-sm">{sumLabel}</td>
-              <td colSpan={4} className="rounded-br-xl px-4 py-3.5" />
-            </tr>
-          </tfoot>
-        </table>
+                      {m?.action_required && m.action_description?.trim() ? (
+                        <div className="sm:col-span-2">
+                          <dt className="text-xs font-medium text-zinc-500">Handlung</dt>
+                          <dd className="mt-1 text-zinc-800">{m.action_description.trim()}</dd>
+                        </div>
+                      ) : null}
+                      {m?.summary?.trim() ? (
+                        <div className="sm:col-span-2">
+                          <dt className="text-xs font-medium text-zinc-500">Kurzüberblick</dt>
+                          <dd className="mt-1 whitespace-pre-wrap leading-relaxed text-zinc-700">
+                            {m.summary.trim()}
+                          </dd>
+                        </div>
+                      ) : null}
+                      {doc.completion_note?.trim() ? (
+                        <div className="sm:col-span-2">
+                          <dt className="text-xs font-medium text-zinc-500">Notiz (vollständig)</dt>
+                          <dd className="mt-1 whitespace-pre-wrap leading-relaxed text-zinc-700">
+                            {doc.completion_note.trim()}
+                          </dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  </div>
+                ) : null}
+              </article>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="rounded-2xl border border-zinc-200/90 bg-white px-4 py-4 shadow-sm ring-1 ring-zinc-100/80 sm:px-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Summe Beträge (gefiltert)
+          </span>
+          {sumLabel}
+        </div>
       </div>
     </div>
   );
