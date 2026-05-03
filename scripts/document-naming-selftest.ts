@@ -55,4 +55,14 @@ const fromAnalysis = buildDocumentNamesFromAnalysis({
 });
 assert.equal(fromAnalysis.machine_name, boardNames.machine_name);
 
+const boiler = generateDocumentNames({
+  category: "Versicherungen",
+  sender: "Muster AG",
+  topic: "Es handelt sich um eine Lebensversicherung Auszug",
+  date: "2026-04-10",
+});
+assert.ok(!/\bes\b/i.test(boiler.display_name));
+assert.ok(!/handelt/i.test(boiler.display_name));
+assert.ok(boiler.display_name.includes("10.04.2026"));
+
 console.log("document-naming-selftest: ok");
