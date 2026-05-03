@@ -36,6 +36,10 @@ export function FragenClient() {
         <label htmlFor="frage" className="block text-sm font-medium text-zinc-700">
           Deine Frage
         </label>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Es werden Metadaten und der gespeicherte Volltext aus der letzten Analyse genutzt. Sehr alte
+          Dokumente ggf. einmal erneut analysieren, damit der Text für Detailfragen vorliegt.
+        </p>
         <textarea
           id="frage"
           required

@@ -1,5 +1,6 @@
 import { resolveOpenAiChatModel } from "@/lib/ai/resolve-openai-model";
 import {
+  ASK_CONTEXT_EXTRACT_TOTAL,
   detectAskFilters,
   filterAskRows,
   formatAskContextBlock,
@@ -56,7 +57,8 @@ export async function POST(request: Request) {
         action_description,
         amount,
         currency,
-        raw_ai_json
+        raw_ai_json,
+        extracted_text
       )
     `;
   const selectBase = `
@@ -75,7 +77,8 @@ export async function POST(request: Request) {
         action_description,
         amount,
         currency,
-        raw_ai_json
+        raw_ai_json,
+        extracted_text
       )
     `;
 
@@ -124,7 +127,8 @@ export async function POST(request: Request) {
   }
 
   const forContext = filtered.length > 0 ? filtered : rawRows.slice(0, 150);
-  const blocks = forContext.map((r, i) => formatAskContextBlock(r, i));
+  const fullTextBudget = { remaining: ASK_CONTEXT_EXTRACT_TOTAL };
+  const blocks = forContext.map((r, i) => formatAskContextBlock(r, i, fullTextBudget));
 
   const context =
     blocks.length > 0
@@ -146,7 +150,8 @@ export async function POST(request: Request) {
       {
         role: "system",
         content:
-          "Du bist ein Assistent für eine private Postbox. Die Nutzerfrage bezieht sich auf die mitgelieferte Dokumentliste (bis zu mehreren hundert Einträge, mit ID, Metadaten und ggf. Notiz beim Erledigen). " +
+          "Du bist ein Assistent für eine private Postbox. Die Nutzerfrage bezieht sich auf die mitgelieferte Dokumentliste (Metadaten, Kurzinfo, ggf. Notiz beim Erledigen) und pro Dokument auf einen Auszug aus dem gespeicherten maschinenlesbaren Volltext (Extrakt), sofern vorhanden. " +
+          "Nutze den Volltext-Auszug für Detailfragen (z. B. Sitzplatz, Flugnummer, Adressen im Fließtext). Wenn der Extrakt fehlt, gekürzt wurde oder das Kontextlimit weitere Volltexte ausließ, sage das klar. " +
           "Antworte nur auf Basis dieser Daten. Wenn etwas unklar ist oder nicht in den Daten steht, sage das. " +
           "Bei Listen nenne konkrete Dokumenttitel oder Absender aus den Daten. Kurz und auf Deutsch, keine erfundenen Details.",
       },

@@ -1,6 +1,13 @@
 import { addDaysToYmd, calendarWeekRangeMonSun, compareYmd, todayYmd } from "@/lib/documents/format";
 import { completionNoteFromRawAi } from "@/lib/documents/workspace-mvp";
 
+/** Max. Zeichen Volltext pro Dokument im Fragen-Kontext. */
+export const ASK_CONTEXT_EXTRACT_PER_DOC = 20_000;
+/** Summe aller Volltext-Auszüge pro Anfrage (Restbudget fürs Modell). */
+export const ASK_CONTEXT_EXTRACT_TOTAL = 120_000;
+
+export type AskFullTextBudget = { remaining: number };
+
 export type AskFilterFlags = {
   /** Fristen in der nächsten Kalenderwoche (Mo–So). */
   dueNextWeek?: boolean;
@@ -57,6 +64,7 @@ type AskMeta = {
   amount?: number | string | null;
   currency?: string | null;
   raw_ai_json?: unknown;
+  extracted_text?: string | null;
 };
 
 function metaOf(r: AskDocRow) {
@@ -82,7 +90,11 @@ export function filterAskRows(rows: AskDocRow[], flags: AskFilterFlags): AskDocR
   return out;
 }
 
-export function formatAskContextBlock(r: AskDocRow, index: number): string {
+export function formatAskContextBlock(
+  r: AskDocRow,
+  index: number,
+  fullTextBudget: AskFullTextBudget
+): string {
   const m = metaOf(r);
   const note = m?.raw_ai_json ? completionNoteFromRawAi(m.raw_ai_json) : null;
   const parts = [
@@ -107,5 +119,24 @@ export function formatAskContextBlock(r: AskDocRow, index: number): string {
   if (note) {
     parts.push(`Notiz (beim Erledigen): ${note}`);
   }
-  return parts.join("\n");
+
+  const full = m?.extracted_text?.trim();
+  let extractBlock: string;
+  if (!full) {
+    extractBlock =
+      "\nVolltext (Extrakt): — (kein gespeicherter Text; PDF erneut analysieren oder bei reinen Fotos ggf. nur Kurzinfo.)";
+  } else if (fullTextBudget.remaining <= 0) {
+    extractBlock =
+      "\nVolltext (Extrakt): [nicht mitgeschickt — Kontextlimit; nachfragen mit engerem Zeitraum oder weniger Dokumenten]";
+  } else {
+    const take = Math.min(ASK_CONTEXT_EXTRACT_PER_DOC, fullTextBudget.remaining, full.length);
+    let chunk = full.slice(0, take);
+    fullTextBudget.remaining -= take;
+    if (take < full.length) {
+      chunk += "\n[… gekürzt, Rest des Dokuments nicht im Kontext …]";
+    }
+    extractBlock = `\nVolltext (Extrakt):\n${chunk}`;
+  }
+
+  return parts.join("\n") + extractBlock;
 }

@@ -391,6 +391,8 @@ async function pipelineOne(
   if (upDocErr) throw upDocErr;
 
   const rawPayload = { ...analysis } as Record<string, unknown>;
+  const extractedForDb = extracted.text.slice(0, 64_000);
+
   const { error: metaErr } = await supabase.from("document_metadata").upsert(
     {
       document_id: docId,
@@ -406,6 +408,7 @@ async function pipelineOne(
       action_description: analysis.action_description,
       confidence: analysis.confidence,
       raw_ai_json: rawPayload,
+      extracted_text: extractedForDb.length > 0 ? extractedForDb : null,
     },
     { onConflict: "document_id" }
   );

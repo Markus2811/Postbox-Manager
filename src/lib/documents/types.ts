@@ -10,6 +10,8 @@ export type DocumentMetadataRow = {
   action_description: string | null;
   confidence: number | null;
   raw_ai_json: Record<string, unknown> | null;
+  /** Gespeicherter Volltext (PDF-Extrakt o. ä.); optional, nicht in allen Listen geladen */
+  extracted_text?: string | null;
 };
 
 export type DocumentWorkspaceBucket = "inbox" | "done";

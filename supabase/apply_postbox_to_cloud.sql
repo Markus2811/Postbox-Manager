@@ -51,6 +51,9 @@ create index if not exists document_metadata_user_idx on public.document_metadat
 create index if not exists document_metadata_due_date_idx on public.document_metadata (due_date)
   where due_date is not null;
 
+alter table public.document_metadata
+  add column if not exists extracted_text text;
+
 alter table public.documents enable row level security;
 alter table public.document_metadata enable row level security;
 

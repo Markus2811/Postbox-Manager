@@ -78,6 +78,9 @@ export async function POST(request: Request) {
       }
     }
 
+    const MAX_STORED_EXTRACTED = 64_000;
+    const extractedTextForDb = text.slice(0, MAX_STORED_EXTRACTED);
+
     const analysis = await analyzeWithOpenAI({
       text,
       originalFilename: doc.original_filename,
@@ -139,6 +142,7 @@ export async function POST(request: Request) {
         action_description: analysis.action_description,
         confidence: analysis.confidence,
         raw_ai_json: rawPayload,
+        extracted_text: extractedTextForDb.length > 0 ? extractedTextForDb : null,
       },
       { onConflict: "document_id" }
     );
