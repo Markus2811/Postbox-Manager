@@ -55,7 +55,7 @@ export function DashboardWorkspaceToggle({
           type="button"
           disabled={busy}
           onClick={() => void setInbox()}
-          className="whitespace-nowrap rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+          className="whitespace-nowrap rounded-full border border-amber-200/90 bg-amber-50/90 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
         >
           {busy ? "…" : "Wieder öffnen"}
         </button>
@@ -69,7 +69,7 @@ export function DashboardWorkspaceToggle({
               setNote("");
               setDialogOpen(true);
             }}
-            className="whitespace-nowrap rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="whitespace-nowrap rounded-full border border-emerald-300/90 bg-emerald-50/90 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100/90 disabled:opacity-50"
           >
             Erledigt
           </button>
